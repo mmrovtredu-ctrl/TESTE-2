@@ -1,0 +1,85 @@
+/*
+  responsive.css
+  ---------------
+  Ajustes para tablet e celular.
+  Estratégia: a sidebar fica oculta em telas pequenas e é
+  substituída pelo menu inferior (bottom-nav).
+*/
+
+/* ===================== TABLET (até 1024px) ===================== */
+@media (max-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================== MOBILE (até 768px) ===================== */
+@media (max-width: 768px) {
+  /* Esconde a sidebar e usa o menu inferior */
+  .sidebar {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+  }
+
+  /* Espaço para o conteúdo não ficar embaixo do menu fixo */
+  .main {
+    padding: var(--space-md);
+    padding-bottom: calc(var(--bottom-nav-height) + var(--space-lg));
+  }
+
+  .kpi-grid,
+  .kpi-grid--compact {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .kpi-card__value {
+    font-size: 1.25rem;
+  }
+
+  /* Topbar mais compacta */
+  .topbar {
+    padding: 0 var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .topbar__title span {
+    display: none;
+  }
+
+  .account-switcher__label {
+    display: none;
+  }
+
+  .view__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .view__header .btn {
+    align-self: flex-start;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+  }
+}
+
+/* ===================== TELAS MUITO PEQUENAS (até 380px) ===================== */
+@media (max-width: 380px) {
+  .kpi-grid,
+  .kpi-grid--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .account-switcher__select {
+    max-width: 90px;
+  }
+}
