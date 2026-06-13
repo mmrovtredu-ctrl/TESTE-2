@@ -7,7 +7,7 @@
   Cada bloco abaixo indica de qual endpoint da API do Mercado Livre
   esses dados viriam na versão final. Quando integrar a API real,
   basta substituir essas constantes por chamadas fetch() que retornem
-  no MESMO FORMATO — assim nenhum outro arquivo JS precisa mudar.h
+  no MESMO FORMATO — assim nenhum outro arquivo JS precisa mudar.
 */
 
 // ============================================================
@@ -15,10 +15,10 @@
 // não da API do ML diretamente. Cada conta guarda os tokens OAuth2.
 // ============================================================
 const MOCK_ACCOUNTS = [
-  { id: "acc_1", nickname: "Urso Forte", mlUserId: null, connected: false },
-  { id: "acc_2", nickname: "TecService", mlUserId: null, connected: false },
-  { id: "acc_3", nickname: "Ice", mlUserId: null, connected: false },
-  { id: "acc_4", nickname: "Breno", mlUserId: null, connected: false },
+  { id: "acc_1", nickname: "Ice", mlUserId: "111111111", connected: true },
+  { id: "acc_2", nickname: "Breno", mlUserId: "222222222", connected: true },
+  { id: "acc_3", nickname: "Urso Forte", mlUserId: "333333333", connected: true },
+  { id: "acc_4", nickname: "TecService", mlUserId: "444444444", connected: false }, // exemplo: token expirado
 ];
 
 // ============================================================
