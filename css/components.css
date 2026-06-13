@@ -498,3 +498,160 @@
   color: var(--color-text-muted);
   font-family: var(--font-mono);
 }
+
+/*
+  pricing-tiers.css
+  -----------------
+  Estilos para os 3 cards de estratégia de preço
+  (mínimo / recomendado / premium) na análise completa.
+
+  INSTRUÇÕES: adicione ao final de css/components.css
+*/
+
+.pricing-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.pricing-tier {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pricing-tier--recommended {
+  border-color: var(--color-accent-strong);
+  background: rgba(200, 255, 77, 0.08);
+}
+
+.pricing-tier__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.pricing-tier__value {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.pricing-tier__description {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .pricing-tiers {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+  campaigns-expand.css
+  --------------------
+  Estilos para a tabela de campanhas expansível (clique na
+  linha para ver os produtos daquela campanha).
+
+  INSTRUÇÕES: adicione ao final de css/components.css
+*/
+
+.campaign-row:hover {
+  background: var(--color-bg-elevated-2);
+}
+
+.campaign-detail-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.campaign-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--color-bg);
+}
+
+.campaign-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.82rem;
+}
+
+.campaign-item:last-child {
+  border-bottom: none;
+}
+
+.campaign-item__name {
+  font-weight: 500;
+}
+
+.campaign-item__meta {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+/*
+  monitor-status.css
+  ------------------
+  Estilos para o painel de status do monitoramento e para
+  as bordas de severidade dos alertas.
+
+  INSTRUÇÕES: adicione ao final de css/components.css
+*/
+
+/* ===================== STATUS DO MONITOR ===================== */
+.monitor-status__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-md);
+}
+
+.monitor-status__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.monitor-status__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.monitor-status__item strong {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .monitor-status__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===================== SEVERIDADE DOS ALERTAS ===================== */
+.alert-item--high {
+  border-left: 4px solid var(--color-negative);
+}
+
+.alert-item--medium {
+  border-left: 4px solid var(--color-accent-strong);
+}
+
+.alert-item--low {
+  border-left: 4px solid var(--color-info);
+}
