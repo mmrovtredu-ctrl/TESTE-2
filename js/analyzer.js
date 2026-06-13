@@ -5,13 +5,18 @@
   - Formulário onde o usuário cola um link ou nome de produto
   - Estado de carregamento enquanto o agente "processa"
   - Exibição do anúncio atual vs sugestão otimizada
+  - ANÁLISE COMPLETA: veredito, potencial de mercado,
+    competitividade, estratégia de preço (3 níveis), estimativa
+    de vendas/faturamento baseada nos concorrentes, ansiedades
+    do comprador e outros insights.
 
   INTEGRAÇÃO REAL:
   No lugar de simulateAnalysis(), você vai chamar seu backend, que:
-  1. Faz scraping do link do ML (título, descrição, imagens, tags)
-  2. Busca o nome do produto no Google Custom Search
-  3. Envia tudo para a API da Anthropic com um prompt estruturado
-  4. Retorna um JSON no mesmo formato de MOCK_ANALYZER_RESULT
+  1. Faz scraping do link do ML (título, descrição, imagens, tags, preço)
+  2. Busca os concorrentes da mesma categoria (top 5)
+  3. Busca o nome do produto no Google Custom Search
+  4. Envia tudo para a API da Anthropic com um prompt estruturado
+  5. Retorna um JSON combinando MOCK_ANALYZER_RESULT + MOCK_PRODUCT_ANALYSIS
 */
 
 /**
@@ -73,12 +78,151 @@ function renderAnalyzerSuggestion(suggestion) {
 }
 
 /**
+ * Retorna a tag colorida para o veredito ("vale a pena vender?").
+ * @param {string} verdict
+ * @returns {string}
+ */
+function verdictTag(verdict) {
+  let cls = "tag--warn";
+  if (verdict === "Vale a pena vender") cls = "tag--ok";
+  if (verdict === "Não recomendado") cls = "tag--danger";
+  return `<span class="tag ${cls}" style="font-size:0.9rem; padding:6px 14px;">${verdict}</span>`;
+}
+
+/**
+ * Renderiza o veredito geral (vale a pena vender ou não).
+ * @param {object} overview - MOCK_PRODUCT_ANALYSIS.overview
+ */
+function renderVerdict(overview) {
+  const box = document.getElementById("anzVerdict");
+  box.innerHTML = `
+    <div class="result-block__field">
+      ${verdictTag(overview.verdict)}
+    </div>
+    <div class="result-block__field">
+      <span>Por quê</span>
+      <p>${overview.verdictReasoning}</p>
+    </div>
+  `;
+}
+
+/**
+ * Renderiza os 4 KPIs de potencial/competitividade/conversão/preço médio.
+ * @param {object} overview - MOCK_PRODUCT_ANALYSIS.overview
+ * @param {object} competitorPricing - MOCK_PRODUCT_ANALYSIS.competitorPricing
+ */
+function renderAnalysisKpis(overview, competitorPricing) {
+  document.getElementById("anzMarketPotential").textContent = overview.marketPotential;
+  document.getElementById("anzCompetitiveness").textContent = overview.competitiveness;
+  document.getElementById("anzConversion").textContent = overview.conversionPotential;
+  document.getElementById("anzAvgPrice").textContent = formatCurrency(competitorPricing.average);
+}
+
+/**
+ * Renderiza os 3 cards de estratégia de preço (mínimo/recomendado/premium).
+ * @param {object} pricingStrategy - MOCK_PRODUCT_ANALYSIS.pricingStrategy
+ */
+function renderPricingTiers(pricingStrategy) {
+  const box = document.getElementById("anzPricingTiers");
+  const tiers = [
+    { key: "minPrice", extraClass: "" },
+    { key: "recommendedPrice", extraClass: "pricing-tier--recommended" },
+    { key: "premiumPrice", extraClass: "" },
+  ];
+
+  box.innerHTML = tiers
+    .map(({ key, extraClass }) => {
+      const tier = pricingStrategy[key];
+      return `
+        <div class="pricing-tier ${extraClass}">
+          <span class="pricing-tier__label">${tier.label}</span>
+          <strong class="pricing-tier__value">${formatCurrency(tier.value)}</strong>
+          <p class="pricing-tier__description">${tier.description}</p>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+/**
+ * Renderiza a estimativa de vendas e faturamento.
+ * @param {object} salesEstimate - MOCK_PRODUCT_ANALYSIS.salesEstimate
+ */
+function renderAnalysisSalesEstimate(salesEstimate) {
+  const box = document.getElementById("anzSalesEstimate");
+  box.innerHTML = `
+    <div class="result-block__tags">
+      <span class="tag tag--ok">${salesEstimate.estimatedMonthlySales} un./mês estimadas</span>
+      <span class="tag tag--ok">${formatCurrency(salesEstimate.estimatedMonthlyRevenue)}/mês estimado</span>
+      <span class="tag tag--warn">Concorrentes vendem em média ${salesEstimate.competitorAvgSales30d} un./mês</span>
+    </div>
+    <div class="result-block__field">
+      <span>Como chegamos nesse número</span>
+      <p>${salesEstimate.reasoning}</p>
+    </div>
+  `;
+}
+
+/**
+ * Renderiza a lista de ansiedades do comprador.
+ * @param {string[]} items - MOCK_PRODUCT_ANALYSIS.buyerAnxieties
+ */
+function renderAnalysisAnxieties(items) {
+  const box = document.getElementById("anzAnxieties");
+  box.innerHTML = `
+    <ul style="padding-left: 18px; display:flex; flex-direction:column; gap:8px;">
+      ${items.map((i) => `<li>${i}</li>`).join("")}
+    </ul>
+  `;
+}
+
+/**
+ * Renderiza os insights adicionais (sazonalidade, diferenciais, riscos, oportunidades).
+ * @param {object[]} insights - MOCK_PRODUCT_ANALYSIS.additionalInsights
+ */
+function renderAnalysisInsights(insights) {
+  const box = document.getElementById("anzInsights");
+  box.innerHTML = insights
+    .map(
+      (item) => `
+      <div class="result-block__field">
+        <span>${item.title}</span>
+        <p>${item.detail}</p>
+      </div>
+    `
+    )
+    .join("");
+}
+
+/**
+ * Renderiza todos os blocos da análise completa.
+ * @param {object} analysis - MOCK_PRODUCT_ANALYSIS
+ */
+function renderFullAnalysis(analysis) {
+  renderVerdict(analysis.overview);
+  renderAnalysisKpis(analysis.overview, analysis.competitorPricing);
+  renderPricingTiers(analysis.pricingStrategy);
+  renderAnalysisSalesEstimate(analysis.salesEstimate);
+  renderAnalysisAnxieties(analysis.buyerAnxieties);
+  renderAnalysisInsights(analysis.additionalInsights);
+}
+
+/**
  * Simula a chamada ao agente de IA (substitua por fetch real).
- * @returns {Promise<object>} resolve com MOCK_ANALYZER_RESULT
+ * Retorna tanto o resultado do anúncio (original/sugestão) quanto
+ * a análise completa do produto.
+ * @returns {Promise<{ad: object, analysis: object}>}
  */
 function simulateAnalysis() {
   return new Promise((resolve) => {
-    setTimeout(() => resolve(MOCK_ANALYZER_RESULT), 1400);
+    setTimeout(
+      () =>
+        resolve({
+          ad: MOCK_ANALYZER_RESULT,
+          analysis: MOCK_PRODUCT_ANALYSIS,
+        }),
+      1400
+    );
   });
 }
 
@@ -89,6 +233,7 @@ function initAnalyzer() {
   const form = document.getElementById("analyzerForm");
   const loading = document.getElementById("analyzerLoading");
   const result = document.getElementById("analyzerResult");
+  const fullAnalysis = document.getElementById("analyzerFullAnalysis");
   const submitBtn = document.getElementById("analyzerSubmit");
 
   form.addEventListener("submit", async (e) => {
@@ -99,6 +244,7 @@ function initAnalyzer() {
 
     // Mostra estado de carregamento
     result.classList.add("is-hidden");
+    fullAnalysis.classList.add("is-hidden");
     loading.classList.remove("is-hidden");
     submitBtn.disabled = true;
     submitBtn.textContent = "Analisando…";
@@ -108,11 +254,13 @@ function initAnalyzer() {
       const data = await simulateAnalysis();
       // -----------------------------------------------------
 
-      renderAnalyzerOriginal(data.original);
-      renderAnalyzerSuggestion(data.suggestion);
+      renderAnalyzerOriginal(data.ad.original);
+      renderAnalyzerSuggestion(data.ad.suggestion);
+      renderFullAnalysis(data.analysis);
 
       loading.classList.add("is-hidden");
       result.classList.remove("is-hidden");
+      fullAnalysis.classList.remove("is-hidden");
     } catch (err) {
       loading.classList.add("is-hidden");
       alert("Erro ao analisar o produto. Tente novamente.");

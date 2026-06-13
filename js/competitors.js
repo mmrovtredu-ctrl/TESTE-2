@@ -4,7 +4,17 @@
   Preenche a view "Concorrentes":
   - Seletor de produto do catálogo
   - Gráfico de histórico de preço (você vs menor concorrente)
-  - Lista de concorrentes encontrados para o produto selecionado
+  - Tabela detalhada com os TOP 5 concorrentes do produto
+    selecionado (preço, estoque, vendas, reputação, avaliação, frete)
+
+  Dados de:
+  - MOCK_COMPETITOR_DATA (histórico de preço — data/mockData.js)
+  - MOCK_COMPETITORS_DETAIL (detalhes dos top 5 — data/mockData_v2.js)
+
+  Em produção:
+  - Histórico de preço: job próprio que salva snapshots diários
+  - Top 5 detalhado: GET /sites/MLB/search?q={produto} + dados de
+    reputação via /users/{seller_id} para cada concorrente
 */
 
 let priceHistoryChartInstance = null;
@@ -51,67 +61,87 @@ function renderPriceHistoryChart(product) {
         {
           label: "Seu preço",
           data: product.history.yourPrice,
-          borderColor: "#ffb454",
+          borderColor: "#1a1a2e",
           backgroundColor: "transparent",
           tension: 0,
           pointRadius: 0,
           borderDash: [4, 4],
+          borderWidth: 2,
         },
         {
           label: "Menor concorrente",
           data: product.history.competitor,
-          borderColor: "#5fb3d9",
-          backgroundColor: "rgba(95, 179, 217, 0.12)",
+          borderColor: "#5b7fff",
+          backgroundColor: "rgba(91, 127, 255, 0.1)",
           fill: true,
           tension: 0.3,
           pointRadius: 0,
+          borderWidth: 2.5,
         },
       ],
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { position: "bottom", labels: { color: "#8fa3b8" } },
+        legend: { position: "bottom", labels: { color: "#6b6b7d" } },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: "#5d7186" } },
-        y: { grid: { color: "#213548" }, ticks: { color: "#5d7186" } },
+        x: { grid: { display: false }, ticks: { color: "#a3a0b3" } },
+        y: { grid: { color: "#ebe6dc" }, ticks: { color: "#a3a0b3" } },
       },
     },
   });
 }
 
 /**
- * Renderiza a lista de concorrentes encontrados para o produto selecionado.
- * @param {object} product
+ * Retorna a tag de reputação colorida conforme o nível.
+ * @param {string} reputation
+ * @returns {string}
  */
-function renderCompetitorList(product) {
-  const list = document.getElementById("competitorListBox");
-  list.innerHTML = "";
+function reputationTag(reputation) {
+  let cls = "tag--warn";
+  if (reputation === "Mercado Líder") cls = "tag--ok";
+  if (reputation === "Novo vendedor") cls = "tag--danger";
+  return `<span class="tag ${cls}">${reputation}</span>`;
+}
 
-  if (product.competitors.length === 0) {
-    list.innerHTML = `<li>Nenhum concorrente encontrado para este produto.</li>`;
+/**
+ * Renderiza a tabela com os top 5 concorrentes detalhados do produto.
+ * @param {string} productId
+ */
+function renderCompetitorDetailTable(productId) {
+  const tbody = document.querySelector("#competitorDetailTable tbody");
+  tbody.innerHTML = "";
+
+  const detail = MOCK_COMPETITORS_DETAIL[productId];
+
+  if (!detail || detail.competitors.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7">Nenhum concorrente encontrado para este produto.</td></tr>`;
     return;
   }
 
-  product.competitors.forEach((c) => {
-    const li = document.createElement("li");
-    const stockLabel = c.stock > 0 ? `${c.stock} em estoque` : "Sem estoque";
-    const stockTag = c.stock > 0 ? "" : `<span class="tag tag--danger">${stockLabel}</span>`;
+  detail.competitors.forEach((c) => {
+    const stockCell =
+      c.stock === 0
+        ? `<span class="tag tag--danger">Sem estoque</span>`
+        : formatNumber(c.stock);
 
-    li.innerHTML = `
-      <div>
-        <div>${c.seller}</div>
-        ${c.stock > 0 ? `<span class="panel__hint">${stockLabel}</span>` : stockTag}
-      </div>
-      <span class="competitor-list__price">${formatCurrency(c.price)}</span>
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><a href="${c.link}" target="_blank" rel="noopener">${c.seller}</a></td>
+      <td>${formatCurrency(c.price)}</td>
+      <td>${stockCell}</td>
+      <td>${formatNumber(c.sales30d)}</td>
+      <td>${reputationTag(c.reputation)}</td>
+      <td>★ ${c.rating.toFixed(1)} (${formatNumber(c.reviewsCount)})</td>
+      <td>${c.shipping}</td>
     `;
-    list.appendChild(li);
+    tbody.appendChild(tr);
   });
 }
 
 /**
- * Carrega o produto selecionado e atualiza gráfico + lista.
+ * Carrega o produto selecionado e atualiza gráfico + tabela de concorrentes.
  */
 function loadSelectedCompetitorProduct() {
   const select = document.getElementById("competitorProductSelect");
@@ -124,7 +154,7 @@ function loadSelectedCompetitorProduct() {
   if (!product) return;
 
   renderPriceHistoryChart(product);
-  renderCompetitorList(product);
+  renderCompetitorDetailTable(product.id);
 }
 
 /**

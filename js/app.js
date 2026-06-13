@@ -8,8 +8,8 @@
   1. Navegação e seletor de conta (precisam existir primeiro,
      pois os outros módulos escutam o evento "accountChanged"
      e leem a conta selecionada).
-  2. Cada view (overview, concorrentes, analisador, imagens,
-     campanhas, precificação, alertas).
+  2. Cada view (overview, catálogo, concorrentes, analisador,
+     marketing, imagens, campanhas, precificação, alertas).
 */
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- Views -----
   initOverview();
+  initCatalog();
   initCompetitors();
   initAnalyzer();
   initMarketing();
