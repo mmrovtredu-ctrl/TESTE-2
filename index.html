@@ -11,19 +11,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- CSS separado em arquivos -->
-  <link rel="stylesheet" href="variables.css" />
-  <link rel="stylesheet" href="base.css" />
-  <link rel="stylesheet" href="layout.css" />
-  <link rel="stylesheet" href="components.css" />
-  <link rel="stylesheet" href="responsive.css" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
 
   <!-- Chart.js via CDN para os gráficos -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
   <!-- Supabase: autenticação e banco de dados -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabaseClient.js"></script>
-  <script src="authGuard.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/authGuard.js"></script>
 </head>
 <body>
 
@@ -394,7 +394,7 @@
         </div>
       </section>
 
-
+      <!-- ---------- VIEW: GERAR IMAGEM ---------- -->
       <section class="view" id="view-images" data-view="images">
         <div class="view__header">
           <div>
@@ -598,28 +598,28 @@
 
   <!-- ===================== SCRIPTS ===================== -->
   <!-- Dados simulados (mock) — substitua por chamadas reais à API do Mercado Livre -->
-  <script src="mockData.js"></script>
+  <script src="data/mockData.js"></script>
   <!-- Funções utilitárias (formatação, helpers) -->
-  <script src="utils.js"></script>
+  <script src="js/utils.js"></script>
   <!-- Navegação entre seções e seletor de conta -->
-  <script src="navigation.js"></script>
+  <script src="js/navigation.js"></script>
   <!-- Lógica da visão geral (KPIs, gráficos, tabelas) -->
-  <script src="overview.js"></script>
+  <script src="js/overview.js"></script>
   <!-- Lógica de concorrentes -->
-  <script src="competitors.js"></script>
+  <script src="js/competitors.js"></script>
   <!-- Lógica do analisador de produto -->
-  <script src="analyzer.js"></script>
+  <script src="js/analyzer.js"></script>
   <!-- Lógica do pacote de marketing completo -->
-  <script src="marketing.js"></script>
+  <script src="js/marketing.js"></script>
   <!-- Lógica de geração de imagem -->
-  <script src="images.js"></script>
+  <script src="js/images.js"></script>
   <!-- Lógica de campanhas -->
-  <script src="campaigns.js"></script>
+  <script src="js/campaigns.js"></script>
   <!-- Lógica de precificação -->
-  <script src="pricing.js"></script>
+  <script src="js/pricing.js"></script>
   <!-- Lógica de alertas -->
-  <script src="alerts.js"></script>
+  <script src="js/alerts.js"></script>
   <!-- Inicialização geral -->
-  <script src="app.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
