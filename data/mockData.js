@@ -230,3 +230,144 @@ const MOCK_ANALYZER_RESULT = {
     ],
   },
 };
+
+// ============================================================
+// MARKETING — pacote completo gerado pelo agente de IA a partir
+// de um link de produto.
+//
+// Na versão real, isso vem de uma chamada à API da Anthropic com:
+// 1. Scraping do produto (título, preço, descrição, imagens, categoria)
+// 2. Busca no Mercado Livre dos concorrentes da mesma categoria
+// 3. Busca no Google Trends / Google Search para palavras-chave e sazonalidade
+// 4. Prompt estruturado pedindo cada um dos blocos abaixo em JSON
+// ============================================================
+const MOCK_MARKETING_RESULT = {
+  // Nome do produto identificado a partir do link (usado no cabeçalho do resultado)
+  productName: "Suporte Veicular para Celular",
+
+  // ---------- Análise de mercado ----------
+  marketAnalysis: {
+    summary:
+      "A categoria de suportes veiculares para celular tem alta procura no Mercado Livre, com " +
+      "mais de 200 anúncios concorrentes ativos. A maioria dos anúncios de melhor desempenho " +
+      "investe em título com termos de busca específicos (ex: '360°', 'saída de ar', 'painel') " +
+      "e galeria com 6 a 8 imagens mostrando o produto instalado no carro.",
+    competitionLevel: "Alta",
+    averagePrice: 42.9,
+    topSellerPrice: 35.9,
+    demandTrend: "Estável, com pico em períodos de viagem (feriados e fim de ano)",
+  },
+
+  // ---------- Título otimizado ----------
+  optimizedTitle: {
+    title: "Suporte Veicular para Celular 360° - Encaixe Universal Painel e Saída de Ar",
+    reasoning:
+      "Combina os termos mais buscados pelos compradores (suporte veicular, 360°, encaixe universal) " +
+      "com os locais de instalação (painel e saída de ar), que aparecem com frequência nas buscas " +
+      "relacionadas ao produto.",
+    alternatives: [
+      "Suporte Celular Carro 360° Ajustável - Painel e Ar Condicionado",
+      "Suporte Veicular Universal para Smartphone com Rotação 360°",
+    ],
+  },
+
+  // ---------- Estratégia de preço ----------
+  pricingStrategy: {
+    suggestedPrice: 37.9,
+    minPrice: 34.9,
+    maxPrice: 44.9,
+    reasoning:
+      "O preço sugerido posiciona o produto ligeiramente abaixo da média da categoria (R$ 42,90), " +
+      "mas acima do concorrente mais barato (R$ 35,90), mantendo margem competitiva sem entrar em " +
+      "guerra de preço direta. Recomenda-se testar promoções pontuais reduzindo para R$ 34,90 em " +
+      "datas de alta demanda.",
+  },
+
+  // ---------- Estimativa de vendas ----------
+  salesEstimate: {
+    monthlyUnits: 35,
+    monthlyRevenue: 1326.5,
+    reasoning:
+      "Com base em produtos similares na mesma faixa de preço e categoria, a estimativa considera " +
+      "uma taxa de conversão média de 1,8% sobre as visitas esperadas para um anúncio bem otimizado " +
+      "nesta categoria.",
+  },
+
+  // ---------- Melhor época para vender ----------
+  bestSeason: {
+    peakMonths: ["Dezembro", "Janeiro", "Julho"],
+    reasoning:
+      "Períodos de férias e viagens de fim de ano aumentam a procura por acessórios veiculares, " +
+      "especialmente suportes para GPS e navegação. Recomenda-se reforçar estoque e investir em " +
+      "campanhas pagas nesses meses.",
+  },
+
+  // ---------- Ansiedades do comprador ----------
+  buyerAnxieties: [
+    "Medo de o suporte não encaixar no modelo do carro ou do celular",
+    "Receio de que a fixação solte durante o trajeto e o celular caia",
+    "Dúvida se o produto resiste ao calor do painel no verão",
+    "Insegurança sobre a facilidade de instalação sem ferramentas",
+  ],
+
+  // ---------- Benefícios do produto ----------
+  productBenefits: [
+    "Encaixe universal compatível com a maioria dos smartphones do mercado",
+    "Rotação 360° para ajustar o ângulo ideal de visualização do GPS",
+    "Instalação rápida, sem parafusos ou ferramentas",
+    "Material reforçado, resistente ao calor e uso diário",
+    "Libera as mãos para dirigir com segurança usando navegação por voz",
+  ],
+
+  // ---------- Palavras-chave e tags ----------
+  keywords: {
+    primary: ["suporte celular carro", "suporte veicular 360", "suporte gps carro"],
+    secondary: ["suporte saída de ar", "suporte painel carro", "porta celular veicular", "suporte smartphone carro"],
+    tags: ["acessórios automotivos", "suporte universal", "suporte 360 graus", "suporte gps", "acessório carro celular"],
+  },
+
+  // ---------- Anúncio completo (pronto para copiar) ----------
+  fullAd: {
+    title: "Suporte Veicular para Celular 360° - Encaixe Universal Painel e Saída de Ar",
+    description:
+      "Suporte veicular ajustável em 360°, com encaixe universal compatível com a maioria dos " +
+      "smartphones do mercado. Fixação firme e segura no painel ou na saída de ar do carro, ideal " +
+      "para uso com GPS, aplicativos de navegação e chamadas durante a viagem.\n\n" +
+      "BENEFÍCIOS:\n" +
+      "- Instalação rápida, sem parafusos ou ferramentas\n" +
+      "- Rotação 360° para o melhor ângulo de visualização\n" +
+      "- Material reforçado, resistente ao uso diário e ao calor\n" +
+      "- Compatível com smartphones de diversos tamanhos\n\n" +
+      "ITENS INCLUSOS:\n" +
+      "- 1 suporte veicular para celular\n" +
+      "- Manual de instalação\n\n" +
+      "Garanta mais segurança e praticidade nas suas viagens. Peça já o seu!",
+    bullets: [
+      "Encaixe universal para a maioria dos celulares",
+      "Rotação 360° em todas as direções",
+      "Fixação firme no painel ou saída de ar",
+      "Instalação sem ferramentas em segundos",
+      "Material resistente ao calor e ao uso diário",
+    ],
+  },
+
+  // ---------- Perguntas frequentes ----------
+  faq: [
+    {
+      question: "Esse suporte serve para qualquer celular?",
+      answer: "Sim, o encaixe é ajustável e compatível com a grande maioria dos smartphones do mercado, incluindo modelos com capinha.",
+    },
+    {
+      question: "Precisa de ferramentas para instalar?",
+      answer: "Não. A instalação é simples e rápida, encaixando direto na saída de ar ou no painel do carro, sem parafusos.",
+    },
+    {
+      question: "O suporte aguenta o calor do painel no verão?",
+      answer: "Sim, o material é resistente a altas temperaturas e foi desenvolvido para uso contínuo dentro do veículo.",
+    },
+    {
+      question: "Existe risco de o celular cair durante o trajeto?",
+      answer: "Não, o sistema de encaixe foi projetado para manter o celular firme mesmo em frenagens e percursos com solavancos.",
+    },
+  ],
+};
