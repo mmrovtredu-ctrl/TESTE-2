@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ML Control — Dashboard de Monitoramento</title>
+
+  <!-- Fontes: uma display condensada para números/painéis, e uma sans neutra para texto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- CSS separado em arquivos -->
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+
+  <!-- Chart.js via CDN para os gráficos -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ===================== TOPO: marca + seletor de conta + usuário ===================== -->
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__mark">ML</span>
+      <div class="topbar__title">
+        <strong>Control</strong>
+        <span>Monitoramento multi-conta</span>
+      </div>
+    </div>
+
+    <!-- Seletor de conta: troca qual das 4 contas ML está sendo visualizada -->
+    <div class="account-switcher" id="accountSwitcher">
+      <label class="account-switcher__label" for="accountSelect">Conta</label>
+      <select id="accountSelect" class="account-switcher__select">
+        <!-- opções injetadas via JS a partir de data/accounts.js -->
+      </select>
+      <span class="account-switcher__status" id="accountStatus" title="Status da conexão com a API">●</span>
+    </div>
+
+    <div class="topbar__user">
+      <button class="icon-btn" id="alertsBtn" aria-label="Ver alertas">
+        🔔
+        <span class="badge" id="alertsCount">0</span>
+      </button>
+      <div class="user-pill" id="userPill">U</div>
+    </div>
+  </header>
+
+  <div class="app-shell">
+
+    <!-- ===================== MENU LATERAL ===================== -->
+    <nav class="sidebar" id="sidebar">
+      <button class="nav-item is-active" data-view="overview">
+        <span class="nav-item__icon">📊</span>
+        <span class="nav-item__label">Visão geral</span>
+      </button>
+      <button class="nav-item" data-view="competitors">
+        <span class="nav-item__icon">🎯</span>
+        <span class="nav-item__label">Concorrentes</span>
+      </button>
+      <button class="nav-item" data-view="analyzer">
+        <span class="nav-item__icon">🔍</span>
+        <span class="nav-item__label">Analisar produto</span>
+      </button>
+      <button class="nav-item" data-view="images">
+        <span class="nav-item__icon">🖼️</span>
+        <span class="nav-item__label">Gerar imagem</span>
+      </button>
+      <button class="nav-item" data-view="campaigns">
+        <span class="nav-item__icon">📈</span>
+        <span class="nav-item__label">Campanhas</span>
+      </button>
+      <button class="nav-item" data-view="pricing">
+        <span class="nav-item__icon">💰</span>
+        <span class="nav-item__label">Precificação</span>
+      </button>
+      <button class="nav-item" data-view="alerts">
+        <span class="nav-item__icon">🔔</span>
+        <span class="nav-item__label">Alertas</span>
+      </button>
+    </nav>
+
+    <!-- ===================== CONTEÚDO PRINCIPAL ===================== -->
+    <main class="main" id="mainContent">
+
+      <!-- ---------- VIEW: VISÃO GERAL ---------- -->
+      <section class="view is-active" id="view-overview" data-view="overview">
+        <div class="view__header">
+          <div>
+            <h1>Visão geral</h1>
+            <p class="view__subtitle">Resumo da conta selecionada — atualizado a partir da API do Mercado Livre</p>
+          </div>
+          <button class="btn btn--ghost" id="refreshOverview">↻ Atualizar</button>
+        </div>
+
+        <!-- Cards de métricas principais -->
+        <div class="kpi-grid">
+          <article class="kpi-card">
+            <span class="kpi-card__label">Vendas (30 dias)</span>
+            <strong class="kpi-card__value" id="kpiSales">—</strong>
+            <span class="kpi-card__trend" id="kpiSalesTrend">—</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Faturamento (30 dias)</span>
+            <strong class="kpi-card__value" id="kpiRevenue">—</strong>
+            <span class="kpi-card__trend" id="kpiRevenueTrend">—</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Visitas aos anúncios</span>
+            <strong class="kpi-card__value" id="kpiVisits">—</strong>
+            <span class="kpi-card__trend" id="kpiVisitsTrend">—</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Taxa de conversão</span>
+            <strong class="kpi-card__value" id="kpiConversion">—</strong>
+            <span class="kpi-card__trend" id="kpiConversionTrend">—</span>
+          </article>
+        </div>
+
+        <!-- Gráfico de vendas + Produtos em alta / em baixa -->
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Vendas por dia</h2>
+              <span class="panel__hint">Últimos 14 dias</span>
+            </div>
+            <canvas id="salesChart" height="220"></canvas>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Produtos em destaque</h2>
+              <span class="panel__hint">Alta x baixa procura</span>
+            </div>
+            <div class="tab-group" id="productPerfTabs">
+              <button class="tab is-active" data-tab="up">Em alta</button>
+              <button class="tab" data-tab="down">Vendendo pouco</button>
+            </div>
+            <ul class="product-list" id="productPerfList"></ul>
+          </div>
+        </div>
+
+        <!-- Tabela: preço próprio vs menor concorrente -->
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Seu preço vs concorrência</h2>
+            <span class="panel__hint">Produtos do catálogo monitorados</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="competitorTable">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Seu preço</th>
+                  <th>Menor concorrente</th>
+                  <th>Diferença</th>
+                  <th>Estoque concorrente</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody><!-- preenchido via JS --></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: CONCORRENTES ---------- -->
+      <section class="view" id="view-competitors" data-view="competitors">
+        <div class="view__header">
+          <div>
+            <h1>Monitor de concorrentes</h1>
+            <p class="view__subtitle">Histórico de preço e estoque dos concorrentes ligados ao seu catálogo</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Selecionar produto</h2>
+          </div>
+          <select class="select" id="competitorProductSelect"></select>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Histórico de preço</h2>
+              <span class="panel__hint">Você vs concorrente mais barato</span>
+            </div>
+            <canvas id="priceHistoryChart" height="240"></canvas>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Concorrentes encontrados</h2>
+            </div>
+            <ul class="competitor-list" id="competitorListBox"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: ANALISAR PRODUTO ---------- -->
+      <section class="view" id="view-analyzer" data-view="analyzer">
+        <div class="view__header">
+          <div>
+            <h1>Analisar produto</h1>
+            <p class="view__subtitle">Cole o link ou nome de um produto para gerar um anúncio otimizado</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <form class="form-row" id="analyzerForm">
+            <input
+              type="text"
+              class="input"
+              id="analyzerInput"
+              placeholder="Cole o link do produto no Mercado Livre ou digite o nome"
+              required
+            />
+            <button type="submit" class="btn btn--primary" id="analyzerSubmit">Analisar</button>
+          </form>
+          <p class="form-hint">
+            O agente lê título, descrição, imagens e tags do produto, cruza com resultados de busca do Google
+            e devolve sugestões de melhoria.
+          </p>
+        </div>
+
+        <!-- Estado de carregamento -->
+        <div class="panel is-hidden" id="analyzerLoading">
+          <div class="loading-row">
+            <span class="spinner"></span>
+            <span>Analisando produto e buscando referências…</span>
+          </div>
+        </div>
+
+        <!-- Resultado da análise -->
+        <div class="grid-2 is-hidden" id="analyzerResult">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Anúncio atual</h2>
+            </div>
+            <div class="result-block" id="analyzerOriginal"></div>
+          </div>
+
+          <div class="panel panel--accent">
+            <div class="panel__header">
+              <h2>Sugestão otimizada</h2>
+            </div>
+            <div class="result-block" id="analyzerSuggestion"></div>
+            <button class="btn btn--primary btn--block" id="applySuggestion">Usar esta sugestão</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: GERAR IMAGEM ---------- -->
+      <section class="view" id="view-images" data-view="images">
+        <div class="view__header">
+          <div>
+            <h1>Gerar imagem do produto</h1>
+            <p class="view__subtitle">Envie a foto original e receba uma versão com fundo branco, pronta para o anúncio</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Imagem original</h2>
+            </div>
+            <label class="dropzone" id="imageDropzone">
+              <input type="file" accept="image/*" id="imageInput" hidden />
+              <span class="dropzone__icon">📷</span>
+              <span class="dropzone__text">Clique para enviar uma foto ou arraste aqui</span>
+            </label>
+            <img id="imagePreviewOriginal" class="image-preview is-hidden" alt="Pré-visualização da imagem original" />
+          </div>
+
+          <div class="panel panel--accent">
+            <div class="panel__header">
+              <h2>Resultado — fundo branco</h2>
+            </div>
+            <div class="image-result" id="imageResultBox">
+              <span class="image-result__placeholder">A imagem processada aparece aqui</span>
+            </div>
+            <button class="btn btn--primary btn--block" id="generateImageBtn" disabled>Gerar imagem com fundo branco</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: CAMPANHAS ---------- -->
+      <section class="view" id="view-campaigns" data-view="campaigns">
+        <div class="view__header">
+          <div>
+            <h1>Gestor de campanhas</h1>
+            <p class="view__subtitle">Métricas de Product Ads e recomendações geradas pelo agente</p>
+          </div>
+        </div>
+
+        <div class="kpi-grid kpi-grid--compact">
+          <article class="kpi-card">
+            <span class="kpi-card__label">Investimento (30d)</span>
+            <strong class="kpi-card__value" id="campSpend">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">ACOS</span>
+            <strong class="kpi-card__value" id="campAcos">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Cliques</span>
+            <strong class="kpi-card__value" id="campClicks">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">CTR</span>
+            <strong class="kpi-card__value" id="campCtr">—</strong>
+          </article>
+        </div>
+
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Campanhas ativas</h2>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="campaignsTable">
+              <thead>
+                <tr>
+                  <th>Campanha</th>
+                  <th>Investimento</th>
+                  <th>Cliques</th>
+                  <th>Conversões</th>
+                  <th>ACOS</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel panel--accent">
+          <div class="panel__header">
+            <h2>Recomendações do agente</h2>
+          </div>
+          <ul class="recommendation-list" id="recommendationList"></ul>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: PRECIFICAÇÃO ---------- -->
+      <section class="view" id="view-pricing" data-view="pricing">
+        <div class="view__header">
+          <div>
+            <h1>Precificação rápida</h1>
+            <p class="view__subtitle">Informe os custos e veja o preço sugerido com a margem desejada</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Custos do produto</h2>
+            </div>
+            <form class="form-grid" id="pricingForm">
+              <label class="field">
+                <span>Custo do produto (R$)</span>
+                <input type="number" step="0.01" min="0" class="input" id="pCost" value="0" />
+              </label>
+              <label class="field">
+                <span>Frete pago por você (R$)</span>
+                <input type="number" step="0.01" min="0" class="input" id="pShipping" value="0" />
+              </label>
+              <label class="field">
+                <span>Taxa do Mercado Livre (%)</span>
+                <input type="number" step="0.01" min="0" class="input" id="pFee" value="13" />
+              </label>
+              <label class="field">
+                <span>Imposto (%)</span>
+                <input type="number" step="0.01" min="0" class="input" id="pTax" value="6" />
+              </label>
+              <label class="field">
+                <span>Margem de lucro desejada (%)</span>
+                <input type="number" step="0.01" min="0" class="input" id="pMargin" value="20" />
+              </label>
+            </form>
+          </div>
+
+          <div class="panel panel--accent">
+            <div class="panel__header">
+              <h2>Resultado</h2>
+            </div>
+            <div class="pricing-result">
+              <div class="pricing-result__row">
+                <span>Preço de venda sugerido</span>
+                <strong id="pSuggestedPrice">R$ 0,00</strong>
+              </div>
+              <div class="pricing-result__row">
+                <span>Total de taxas + impostos</span>
+                <strong id="pFeesTotal">R$ 0,00</strong>
+              </div>
+              <div class="pricing-result__row">
+                <span>Lucro líquido por unidade</span>
+                <strong id="pProfit">R$ 0,00</strong>
+              </div>
+              <hr />
+              <div class="pricing-result__row">
+                <span>Estimativa de vendas / mês</span>
+                <strong id="pEstSales">—</strong>
+              </div>
+              <div class="pricing-result__row">
+                <span>Faturamento estimado / mês</span>
+                <strong id="pEstRevenue">—</strong>
+              </div>
+              <p class="form-hint">
+                A estimativa de vendas é calculada com base no histórico médio da categoria e na posição
+                de preço do anúncio em relação à concorrência.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- VIEW: ALERTAS ---------- -->
+      <section class="view" id="view-alerts" data-view="alerts">
+        <div class="view__header">
+          <div>
+            <h1>Alertas</h1>
+            <p class="view__subtitle">Notificações de preço e estoque dos concorrentes</p>
+          </div>
+          <button class="btn btn--ghost" id="markAllRead">Marcar tudo como lido</button>
+        </div>
+
+        <ul class="alert-list" id="alertList"></ul>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===================== MENU MOBILE INFERIOR ===================== -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav__item is-active" data-view="overview">
+      <span>📊</span><small>Geral</small>
+    </button>
+    <button class="bottom-nav__item" data-view="competitors">
+      <span>🎯</span><small>Concorr.</small>
+    </button>
+    <button class="bottom-nav__item" data-view="analyzer">
+      <span>🔍</span><small>Analisar</small>
+    </button>
+    <button class="bottom-nav__item" data-view="campaigns">
+      <span>📈</span><small>Anúncios</small>
+    </button>
+    <button class="bottom-nav__item" data-view="alerts">
+      <span>🔔</span><small>Alertas</small>
+    </button>
+  </nav>
+
+  <!-- ===================== SCRIPTS ===================== -->
+  <!-- Dados simulados (mock) — substitua por chamadas reais à API do Mercado Livre -->
+  <script src="data/mockData.js"></script>
+  <!-- Funções utilitárias (formatação, helpers) -->
+  <script src="js/utils.js"></script>
+  <!-- Navegação entre seções e seletor de conta -->
+  <script src="js/navigation.js"></script>
+  <!-- Lógica da visão geral (KPIs, gráficos, tabelas) -->
+  <script src="js/overview.js"></script>
+  <!-- Lógica de concorrentes -->
+  <script src="js/competitors.js"></script>
+  <!-- Lógica do analisador de produto -->
+  <script src="js/analyzer.js"></script>
+  <!-- Lógica de geração de imagem -->
+  <script src="js/images.js"></script>
+  <!-- Lógica de campanhas -->
+  <script src="js/campaigns.js"></script>
+  <!-- Lógica de precificação -->
+  <script src="js/pricing.js"></script>
+  <!-- Lógica de alertas -->
+  <script src="js/alerts.js"></script>
+  <!-- Inicialização geral -->
+  <script src="js/app.js"></script>
+</body>
+</html>
