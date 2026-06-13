@@ -63,6 +63,10 @@
         <span class="nav-item__icon">📊</span>
         <span class="nav-item__label">Visão geral</span>
       </button>
+      <button class="nav-item" data-view="catalog">
+        <span class="nav-item__icon">📦</span>
+        <span class="nav-item__label">Catálogo</span>
+      </button>
       <button class="nav-item" data-view="competitors">
         <span class="nav-item__icon">🎯</span>
         <span class="nav-item__label">Concorrentes</span>
@@ -177,6 +181,80 @@
         </div>
       </section>
 
+      <!-- ---------- VIEW: CATÁLOGO ---------- -->
+      <section class="view" id="view-catalog" data-view="catalog">
+        <div class="view__header">
+          <div>
+            <h1>Catálogo</h1>
+            <p class="view__subtitle">Todos os produtos cadastrados nesta conta do Mercado Livre</p>
+          </div>
+          <button class="btn btn--ghost" id="refreshCatalog">↻ Atualizar</button>
+        </div>
+
+        <!-- Resumo rápido do catálogo -->
+        <div class="kpi-grid kpi-grid--compact">
+          <article class="kpi-card">
+            <span class="kpi-card__label">Produtos ativos</span>
+            <strong class="kpi-card__value" id="catalogActiveCount">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Sem estoque</span>
+            <strong class="kpi-card__value" id="catalogOutOfStockCount">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Vendas (30d)</span>
+            <strong class="kpi-card__value" id="catalogTotalSales">—</strong>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-card__label">Saúde média</span>
+            <strong class="kpi-card__value" id="catalogAvgHealth">—</strong>
+          </article>
+        </div>
+
+        <!-- Filtro de busca -->
+        <div class="panel">
+          <div class="form-row">
+            <input
+              type="text"
+              class="input"
+              id="catalogSearchInput"
+              placeholder="Buscar por nome ou categoria..."
+            />
+            <select class="select" id="catalogStatusFilter" style="max-width: 180px;">
+              <option value="">Todos os status</option>
+              <option value="ativo">Ativos</option>
+              <option value="sem_estoque">Sem estoque</option>
+              <option value="pausado">Pausados</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tabela do catálogo -->
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Produtos cadastrados</h2>
+            <span class="panel__hint" id="catalogResultCount">—</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="catalogTable">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Preço</th>
+                  <th>Estoque</th>
+                  <th>Vendas (30d)</th>
+                  <th>Visitas (30d)</th>
+                  <th>Saúde</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody><!-- preenchido via JS --></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- VIEW: CONCORRENTES ---------- -->
       <section class="view" id="view-competitors" data-view="competitors">
         <div class="view__header">
@@ -204,9 +282,25 @@
 
           <div class="panel">
             <div class="panel__header">
-              <h2>Concorrentes encontrados</h2>
+              <h2>Top 5 concorrentes</h2>
+              <span class="panel__hint">Mesmo produto, ordenado por relevância</span>
             </div>
-            <ul class="competitor-list" id="competitorListBox"></ul>
+            <div class="table-scroll">
+              <table class="data-table" id="competitorDetailTable">
+                <thead>
+                  <tr>
+                    <th>Vendedor</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Vendas (30d)</th>
+                    <th>Reputação</th>
+                    <th>Avaliação</th>
+                    <th>Frete</th>
+                  </tr>
+                </thead>
+                <tbody><!-- preenchido via JS --></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -261,6 +355,74 @@
             <div class="result-block" id="analyzerSuggestion"></div>
             <button class="btn btn--primary btn--block" id="applySuggestion">Usar esta sugestão</button>
           </div>
+        </div>
+
+        <!-- ===================== ANÁLISE COMPLETA ===================== -->
+        <div class="is-hidden" id="analyzerFullAnalysis" style="display:flex; flex-direction:column; gap: var(--space-lg);">
+
+          <!-- Veredito geral -->
+          <div class="panel panel--accent">
+            <div class="panel__header">
+              <h2>Vale a pena vender?</h2>
+            </div>
+            <div class="result-block" id="anzVerdict"></div>
+          </div>
+
+          <!-- Potencial / Competitividade / Conversão -->
+          <div class="kpi-grid kpi-grid--compact">
+            <article class="kpi-card">
+              <span class="kpi-card__label">Potencial de mercado</span>
+              <strong class="kpi-card__value" id="anzMarketPotential">—</strong>
+            </article>
+            <article class="kpi-card">
+              <span class="kpi-card__label">Competitividade</span>
+              <strong class="kpi-card__value" id="anzCompetitiveness">—</strong>
+            </article>
+            <article class="kpi-card">
+              <span class="kpi-card__label">Potencial de conversão</span>
+              <strong class="kpi-card__value" id="anzConversion">—</strong>
+            </article>
+            <article class="kpi-card">
+              <span class="kpi-card__label">Preço médio concorrência</span>
+              <strong class="kpi-card__value" id="anzAvgPrice">—</strong>
+            </article>
+          </div>
+
+          <!-- Estratégia de preço: 3 níveis -->
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Estratégia de preço</h2>
+              <span class="panel__hint">Três níveis sugeridos com base na concorrência</span>
+            </div>
+            <div class="pricing-tiers" id="anzPricingTiers"></div>
+          </div>
+
+          <!-- Estimativa de vendas e faturamento -->
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Estimativa de vendas e faturamento</h2>
+              <span class="panel__hint">Calculado a partir das vendas dos concorrentes</span>
+            </div>
+            <div class="result-block" id="anzSalesEstimate"></div>
+          </div>
+
+          <!-- Ansiedades do comprador -->
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Ansiedades do comprador</h2>
+              <span class="panel__hint">O que pode travar a compra</span>
+            </div>
+            <div class="result-block" id="anzAnxieties"></div>
+          </div>
+
+          <!-- Outros pontos importantes -->
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Outros pontos importantes</h2>
+            </div>
+            <div class="result-block" id="anzInsights"></div>
+          </div>
+
         </div>
       </section>
 
@@ -456,6 +618,25 @@
           </article>
         </div>
 
+        <!-- Destaques: melhor e pior produto em Ads -->
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>🏆 Melhor desempenho</h2>
+              <span class="panel__hint">Produto com melhor retorno em Ads</span>
+            </div>
+            <div class="result-block" id="campBestPerformer"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <h2>⚠️ Precisa de atenção</h2>
+              <span class="panel__hint">Produto com pior retorno em Ads</span>
+            </div>
+            <div class="result-block" id="campWorstPerformer"></div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel__header">
             <h2>Campanhas ativas</h2>
@@ -467,6 +648,7 @@
                   <th>Campanha</th>
                   <th>Investimento</th>
                   <th>Cliques</th>
+                  <th>Impressões</th>
                   <th>Conversões</th>
                   <th>ACOS</th>
                   <th>Status</th>
@@ -563,11 +745,21 @@
         <div class="view__header">
           <div>
             <h1>Alertas</h1>
-            <p class="view__subtitle">Notificações de preço e estoque dos concorrentes</p>
+            <p class="view__subtitle">Monitoramento automático de preço e estoque dos concorrentes</p>
           </div>
           <button class="btn btn--ghost" id="markAllRead">Marcar tudo como lido</button>
         </div>
 
+        <!-- Status do monitor -->
+        <div class="panel">
+          <div class="panel__header">
+            <h2>Status do monitoramento</h2>
+            <span class="panel__hint">Verificação automática a cada 2 horas</span>
+          </div>
+          <div class="monitor-status" id="monitorStatus"></div>
+        </div>
+
+        <!-- Lista de alertas -->
         <ul class="alert-list" id="alertList"></ul>
       </section>
 
@@ -578,6 +770,9 @@
   <nav class="bottom-nav" id="bottomNav">
     <button class="bottom-nav__item is-active" data-view="overview">
       <span>📊</span><small>Geral</small>
+    </button>
+    <button class="bottom-nav__item" data-view="catalog">
+      <span>📦</span><small>Catálogo</small>
     </button>
     <button class="bottom-nav__item" data-view="competitors">
       <span>🎯</span><small>Concorr.</small>
@@ -605,6 +800,8 @@
   <script src="js/navigation.js"></script>
   <!-- Lógica da visão geral (KPIs, gráficos, tabelas) -->
   <script src="js/overview.js"></script>
+  <!-- Lógica do catálogo de produtos -->
+  <script src="js/catalog.js"></script>
   <!-- Lógica de concorrentes -->
   <script src="js/competitors.js"></script>
   <!-- Lógica do analisador de produto -->
