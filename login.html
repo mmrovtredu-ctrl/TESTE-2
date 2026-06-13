@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar — ML Control</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+
+  <style>
+    /* Estilos específicos da tela de login */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: var(--space-md);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      box-shadow: var(--shadow-card);
+    }
+
+    .login-card__mark {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: var(--color-accent-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.95rem;
+      box-shadow: var(--shadow-accent);
+      margin-bottom: var(--space-md);
+    }
+
+    .login-card h1 {
+      font-size: 1.4rem;
+      margin-bottom: 4px;
+    }
+
+    .login-card p {
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+      margin-bottom: var(--space-lg);
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .login-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+    }
+
+    .login-field input {
+      width: 100%;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--color-text);
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .login-field input:focus {
+      outline: none;
+      border-color: var(--color-accent-strong);
+    }
+
+    .login-btn {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: var(--color-accent-text);
+      box-shadow: var(--shadow-accent);
+      border: none;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+
+    .login-btn:hover {
+      filter: brightness(1.04);
+    }
+
+    .login-btn:disabled {
+      background: var(--color-bg-elevated-2);
+      color: var(--color-text-faint);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .login-error {
+      font-size: 0.85rem;
+      color: var(--color-negative);
+      background: rgba(255, 107, 91, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: none;
+    }
+
+    .login-error.is-visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="login-card__mark">ML</div>
+    <h1>Entrar no ML Control</h1>
+    <p>Use o email e senha cadastrados para acessar o painel.</p>
+
+    <div class="login-error" id="loginError"></div>
+
+    <form class="login-form" id="loginForm">
+      <label class="login-field">
+        <span>Email</span>
+        <input type="email" id="loginEmail" required autocomplete="email" />
+      </label>
+
+      <label class="login-field">
+        <span>Senha</span>
+        <input type="password" id="loginPassword" required autocomplete="current-password" />
+      </label>
+
+      <button type="submit" class="login-btn" id="loginBtn">Entrar</button>
+    </form>
+  </div>
+
+  <!-- Biblioteca do Supabase via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Configuração da conexão (URL + chave do seu projeto) -->
+  <script src="js/supabaseClient.js"></script>
+  <!-- Lógica do formulário de login -->
+  <script src="js/login.js"></script>
+</body>
+</html>
