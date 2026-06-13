@@ -1,0 +1,61 @@
+/*
+  variables.css
+  -------------
+  Tokens de design do ML Control — v2 "Vitrine".
+
+  Conceito: painel claro inspirado em vitrines de loja e etiquetas
+  de produto/promoção. Fundo off-white quente, cards brancos bem
+  arredondados (como cartões de oferta), verde-lima como cor de
+  "destaque/em alta" (a cor de uma etiqueta de promoção), coral
+  para alertas e azul para informação.
+
+  Tipografia: Sora para títulos (geométrica, arredondada — ecoa os
+  cantos dos cards), Inter para texto corrido, JetBrains Mono para
+  números e dados tabulares.
+*/
+
+:root {
+  /* ===== Cores base ===== */
+  --color-bg: #faf7f2;             /* fundo principal — off-white quente */
+  --color-bg-elevated: #ffffff;    /* cards e painéis */
+  --color-bg-elevated-2: #f3efe7;  /* hover / elementos secundários */
+  --color-border: #ebe6dc;         /* linhas e divisórias */
+
+  --color-text: #1a1a2e;           /* texto principal — quase preto azulado */
+  --color-text-muted: #6b6b7d;     /* texto secundário */
+  --color-text-faint: #a3a0b3;     /* texto terciário / placeholders */
+
+  /* ===== Acentos ===== */
+  --color-accent: #c8ff4d;         /* verde-lima — destaque principal, "em alta" */
+  --color-accent-strong: #aee62e;
+  --color-accent-text: #2b3a00;    /* texto sobre fundo lima (contraste) */
+  --color-positive: #2fae6e;       /* verde — lucro, ok */
+  --color-negative: #ff6b5b;       /* coral — queda, alerta crítico */
+  --color-info: #5b7fff;           /* azul — informativo, links */
+
+  /* ===== Tipografia ===== */
+  --font-display: "Sora", "Inter", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+
+  /* ===== Espaçamento ===== */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* ===== Layout ===== */
+  --sidebar-width: 232px;
+  --topbar-height: 68px;
+  --bottom-nav-height: 64px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  /* ===== Sombras (suaves, levemente coloridas) ===== */
+  --shadow-card: 0 8px 24px -8px rgba(26, 26, 46, 0.08);
+  --shadow-card-hover: 0 12px 28px -8px rgba(26, 26, 46, 0.12);
+  --shadow-accent: 0 8px 20px -6px rgba(200, 255, 77, 0.5);
+}
