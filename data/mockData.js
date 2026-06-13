@@ -371,3 +371,455 @@ const MOCK_MARKETING_RESULT = {
     },
   ],
 };
+
+
+/*
+  mockData_v2.js
+  --------------
+  EXTENSÃO de mockData.js — novos blocos de dados para:
+  - Catálogo completo de produtos cadastrados (MOCK_CATALOG)
+  - Top 5 concorrentes detalhados por produto (MOCK_COMPETITORS_DETAIL)
+  - Análise completa do produto (MOCK_PRODUCT_ANALYSIS)
+  - Campanhas detalhadas (MOCK_CAMPAIGNS_DETAIL)
+  - Alertas de monitoramento 2h (MOCK_MONITOR_ALERTS)
+
+  INSTRUÇÕES: adicione este conteúdo ao FINAL do arquivo
+  data/mockData.js (não substitui, complementa).
+
+  IMPORTANTE PARA O BACKEND:
+  Cada bloco indica o endpoint real que vai alimentar esses dados.
+  O formato aqui é o CONTRATO entre front e backend — ao integrar
+  a API real, o backend deve devolver objetos neste mesmo formato.
+*/
+
+// ============================================================
+// CATÁLOGO COMPLETO — endpoint: /users/{user_id}/items/search
+// + /items/{id} para detalhes de cada produto
+//
+// Esta é a lista COMPLETA de produtos cadastrados na conta ML,
+// usada na nova tela "Catálogo".
+// ============================================================
+const MOCK_CATALOG = {
+  acc_1: [
+    {
+      id: "MLB001",
+      name: "Suporte de celular veicular",
+      thumbnail: null, // URL da imagem do anúncio
+      price: 39.9,
+      stock: 124,
+      sales30d: 42,
+      visits30d: 1850,
+      status: "ativo", // ativo | pausado | sem_estoque
+      health: 92, // "saúde do anúncio" do ML, 0-100
+      category: "Acessórios para Veículos",
+    },
+    {
+      id: "MLB002",
+      name: "Carregador USB-C 30W",
+      thumbnail: null,
+      price: 54.9,
+      stock: 8,
+      sales30d: 35,
+      visits30d: 1420,
+      status: "ativo",
+      health: 88,
+      category: "Carregadores",
+    },
+    {
+      id: "MLB003",
+      name: "Capinha à prova d'água",
+      thumbnail: null,
+      price: 24.9,
+      stock: 200,
+      sales30d: 29,
+      visits30d: 980,
+      status: "ativo",
+      health: 75,
+      category: "Capas e Películas",
+    },
+    {
+      id: "MLB004",
+      name: "Cabo HDMI 2m",
+      thumbnail: null,
+      price: 32.9,
+      stock: 45,
+      sales30d: 3,
+      visits30d: 210,
+      status: "ativo",
+      health: 60,
+      category: "Cabos",
+    },
+    {
+      id: "MLB005",
+      name: "Adaptador USB para P2",
+      thumbnail: null,
+      price: 19.9,
+      stock: 0,
+      sales30d: 5,
+      visits30d: 340,
+      status: "sem_estoque",
+      health: 55,
+      category: "Adaptadores",
+    },
+    {
+      id: "MLB006",
+      name: "Suporte para notebook",
+      thumbnail: null,
+      price: 89.9,
+      stock: 30,
+      sales30d: 6,
+      visits30d: 510,
+      status: "ativo",
+      health: 70,
+      category: "Acessórios para Notebook",
+    },
+  ],
+};
+
+// ============================================================
+// CONCORRENTES DETALHADOS (TOP 5) — endpoint: /sites/MLB/search
+// + scraping complementar (vendas estimadas, reputação)
+//
+// Para cada produto do seu catálogo, lista os 5 concorrentes
+// mais relevantes (mesmo produto/categoria) com dados completos.
+// ============================================================
+const MOCK_COMPETITORS_DETAIL = {
+  MLB001: {
+    productName: "Suporte de celular veicular",
+    yourPrice: 39.9,
+    yourStock: 124,
+    competitors: [
+      {
+        seller: "Loja TechMix",
+        price: 35.9,
+        stock: 12,
+        sales30d: 310,
+        reputation: "Mercado Líder",
+        shipping: "Frete grátis (Full)",
+        rating: 4.8,
+        reviewsCount: 1240,
+        link: "#",
+      },
+      {
+        seller: "ImportShop BR",
+        price: 37.5,
+        stock: 0,
+        sales30d: 180,
+        reputation: "Vendedor confiável",
+        shipping: "Frete grátis",
+        rating: 4.6,
+        reviewsCount: 530,
+        link: "#",
+      },
+      {
+        seller: "AutoAcessórios",
+        price: 41.0,
+        stock: 30,
+        sales30d: 95,
+        reputation: "Mercado Líder",
+        shipping: "Frete pago",
+        rating: 4.7,
+        reviewsCount: 410,
+        link: "#",
+      },
+      {
+        seller: "CarShop Express",
+        price: 43.9,
+        stock: 60,
+        sales30d: 60,
+        reputation: "Vendedor confiável",
+        shipping: "Frete grátis (Full)",
+        rating: 4.5,
+        reviewsCount: 220,
+        link: "#",
+      },
+      {
+        seller: "Acessórios Premium",
+        price: 45.5,
+        stock: 15,
+        sales30d: 40,
+        reputation: "Novo vendedor",
+        shipping: "Frete pago",
+        rating: 4.2,
+        reviewsCount: 58,
+        link: "#",
+      },
+    ],
+  },
+};
+
+// ============================================================
+// ANÁLISE COMPLETA DO PRODUTO — endpoint composto:
+// scraping concorrência + Google Trends + agente de IA (Anthropic)
+//
+// Esta é a análise que aparece na tela "Analisar produto" após
+// colar o link. Combina dados de mercado, 3 níveis de preço,
+// estimativa de vendas/faturamento baseada nos concorrentes,
+// e os blocos qualitativos (ansiedades, pontos importantes).
+// ============================================================
+const MOCK_PRODUCT_ANALYSIS = {
+  productName: "Suporte Veicular para Celular 360°",
+
+  // ---------- Visão geral / veredito ----------
+  overview: {
+    verdict: "Vale a pena vender", // "Vale a pena vender" | "Risco moderado" | "Não recomendado"
+    verdictReasoning:
+      "Categoria com demanda estável, concorrência alta mas com espaço de preço entre " +
+      "R$ 35,90 e R$ 45,50. Seu produto pode entrar com preço competitivo e boa margem.",
+    marketPotential: "Alto", // Alto | Médio | Baixo
+    competitiveness: "Média-Alta", // Baixa | Média | Média-Alta | Alta
+    conversionPotential: "Médio", // Baixo | Médio | Alto
+  },
+
+  // ---------- Preço dos concorrentes (resumo) ----------
+  competitorPricing: {
+    lowest: 35.9,
+    average: 40.76,
+    highest: 45.5,
+    yourPrice: 39.9,
+    positionVsAverage: "Levemente abaixo da média", // texto descritivo
+  },
+
+  // ---------- Estratégia de preço (3 níveis) ----------
+  pricingStrategy: {
+    minPrice: {
+      value: 34.9,
+      label: "Preço mínimo",
+      description: "Abaixo do concorrente mais barato. Use só em liquidação ou para ganhar posição rapidamente — margem muito apertada.",
+    },
+    recommendedPrice: {
+      value: 38.9,
+      label: "Preço recomendado",
+      description: "Posiciona seu anúncio entre os 2 concorrentes mais baratos, com margem saudável e boa chance de conversão.",
+    },
+    premiumPrice: {
+      value: 44.9,
+      label: "Preço premium",
+      description: "Próximo do topo da faixa. Viável se o anúncio tiver diferenciais claros (mais imagens, melhor avaliação, frete grátis).",
+    },
+  },
+
+  // ---------- Estimativa de vendas e faturamento (baseado nos concorrentes) ----------
+  salesEstimate: {
+    // Cálculo: média de vendas/30d dos concorrentes, ajustada pela posição de preço
+    competitorAvgSales30d: 137, // média de sales30d dos 5 concorrentes
+    estimatedMonthlySales: 55, // sua estimativa, considerando preço recomendado
+    estimatedMonthlyRevenue: 2139.5, // estimatedMonthlySales * recommendedPrice
+    reasoning:
+      "Os 5 concorrentes somam em média 137 vendas/mês cada. Considerando que seu anúncio " +
+      "entraria com preço competitivo mas reputação/histórico ainda novos, estimamos capturar " +
+      "uma fração inicial de ~40% da média dos concorrentes estabelecidos.",
+  },
+
+  // ---------- Ansiedades do comprador ----------
+  buyerAnxieties: [
+    "Medo de o suporte não encaixar no modelo do carro ou do celular",
+    "Receio de que a fixação solte durante o trajeto e o celular caia",
+    "Dúvida se o produto resiste ao calor do painel no verão",
+    "Insegurança sobre a facilidade de instalação sem ferramentas",
+  ],
+
+  // ---------- Outros pontos importantes ----------
+  additionalInsights: [
+    {
+      title: "Sazonalidade",
+      detail: "Pico de demanda em dezembro/janeiro (viagens de férias) e julho (férias escolares).",
+    },
+    {
+      title: "Diferencial necessário",
+      detail: "Concorrentes líderes têm 4.6+ de avaliação e frete grátis via Full — considere Full para competir.",
+    },
+    {
+      title: "Risco de devolução",
+      detail: "Categoria com risco médio de devolução por incompatibilidade — descrição clara sobre encaixe universal é essencial.",
+    },
+    {
+      title: "Oportunidade",
+      detail: "Concorrente 'ImportShop BR' está sem estoque (preço R$ 37,50) — janela de oportunidade para ganhar posição com preço próximo.",
+    },
+  ],
+};
+
+// ============================================================
+// CAMPANHAS DETALHADAS — endpoint: /advertising/product_ads/campaigns
+// + /advertising/product_ads/campaigns/{id}/items
+//
+// Expande MOCK_CAMPAIGNS com detalhamento por produto dentro
+// de cada campanha, e totais consolidados.
+// ============================================================
+const MOCK_CAMPAIGNS_DETAIL = {
+  acc_1: {
+    totals: {
+      totalSpend30d: 1240.5,
+      totalRevenue30d: 8732.0,
+      totalAcos: 14.2,
+      totalClicks: 2380,
+      totalImpressions: 76800,
+      totalCtr: 3.1,
+      activeCampaigns: 2,
+      pausedCampaigns: 1,
+    },
+
+    // Produto que está "queimando" mais dinheiro sem retorno proporcional
+    worstPerformer: {
+      productId: "MLB003",
+      productName: "Capinha à prova d'água",
+      spend30d: 310.5,
+      revenue30d: 658.0,
+      acos: 26.4,
+      clicks: 640,
+      conversions: 22,
+      issue: "ACOS acima da meta (20%) — anúncio pode precisar de revisão de título/imagem antes de continuar investindo.",
+    },
+
+    // Produto com melhor retorno sobre o investimento em Ads
+    bestPerformer: {
+      productId: "MLB001",
+      productName: "Suporte de celular veicular",
+      spend30d: 520.0,
+      revenue30d: 4520.0,
+      acos: 11.5,
+      clicks: 980,
+      conversions: 64,
+      opportunity: "Melhor ACOS da conta — aumentar orçamento diário pode trazer mais vendas mantendo eficiência.",
+    },
+
+    campaigns: [
+      {
+        id: "camp_1",
+        name: "Acessórios Celular - Geral",
+        status: "ativa",
+        spend30d: 520.0,
+        revenue30d: 4520.0,
+        clicks: 980,
+        impressions: 32000,
+        ctr: 3.06,
+        conversions: 64,
+        acos: 11.5,
+        items: [
+          { productId: "MLB001", productName: "Suporte de celular veicular", spend: 380.0, conversions: 48, acos: 10.2 },
+          { productId: "MLB002", productName: "Carregador USB-C 30W", spend: 140.0, conversions: 16, acos: 14.8 },
+        ],
+      },
+      {
+        id: "camp_2",
+        name: "Carregadores - Black Week",
+        status: "ativa",
+        spend30d: 410.0,
+        revenue30d: 2170.0,
+        clicks: 760,
+        impressions: 28400,
+        ctr: 2.68,
+        conversions: 38,
+        acos: 18.9,
+        items: [
+          { productId: "MLB002", productName: "Carregador USB-C 30W", spend: 410.0, conversions: 38, acos: 18.9 },
+        ],
+      },
+      {
+        id: "camp_3",
+        name: "Capinhas - Liquidação",
+        status: "pausada",
+        spend30d: 310.5,
+        revenue30d: 658.0,
+        clicks: 640,
+        impressions: 16400,
+        ctr: 3.90,
+        conversions: 22,
+        acos: 26.4,
+        items: [
+          { productId: "MLB003", productName: "Capinha à prova d'água", spend: 310.5, conversions: 22, acos: 26.4 },
+        ],
+      },
+    ],
+  },
+};
+
+// ============================================================
+// ALERTAS DE MONITORAMENTO (2 EM 2 HORAS)
+// — gerado por job/cron no backend, que a cada 2h:
+//   1. Lê os produtos do catálogo (MOCK_CATALOG)
+//   2. Busca os mesmos produtos nos concorrentes
+//   3. Compara preço e estoque com a última verificação
+//   4. Se preço caiu ou estoque zerou, gera um alerta aqui
+//
+// Cada alerta tem um "checkedAt" (quando o monitor rodou) para
+// o usuário saber a recência da informação.
+// ============================================================
+const MOCK_MONITOR_ALERTS_V2 = {
+  acc_1: [
+    {
+      id: "mon_1",
+      type: "price_drop", // price_drop | out_of_stock | back_in_stock | new_competitor
+      severity: "alta", // alta | media | baixa
+      productId: "MLB001",
+      productName: "Suporte de celular veicular",
+      competitor: "Loja TechMix",
+      message: "Concorrente baixou o preço de R$ 38,90 para R$ 35,90",
+      previousValue: 38.9,
+      currentValue: 35.9,
+      yourPrice: 39.9,
+      checkedAt: "2026-06-13T14:00:00",
+      unread: true,
+    },
+    {
+      id: "mon_2",
+      type: "out_of_stock",
+      severity: "media",
+      productId: "MLB003",
+      productName: "Capinha à prova d'água",
+      competitor: "AcessóriosJá",
+      message: "Concorrente ficou sem estoque — oportunidade de ganhar posição",
+      previousValue: 50,
+      currentValue: 0,
+      yourPrice: 24.9,
+      checkedAt: "2026-06-13T12:00:00",
+      unread: true,
+    },
+    {
+      id: "mon_3",
+      type: "price_drop",
+      severity: "alta",
+      productId: "MLB002",
+      productName: "Carregador USB-C 30W",
+      competitor: "ChargeNow",
+      message: "Concorrente baixou o preço de R$ 54,00 para R$ 51,00",
+      previousValue: 54.0,
+      currentValue: 51.0,
+      yourPrice: 54.9,
+      checkedAt: "2026-06-13T10:00:00",
+      unread: false,
+    },
+    {
+      id: "mon_4",
+      type: "back_in_stock",
+      severity: "baixa",
+      productId: "MLB001",
+      productName: "Suporte de celular veicular",
+      competitor: "ImportShop BR",
+      message: "Concorrente que estava sem estoque voltou a vender (preço R$ 37,50)",
+      previousValue: 0,
+      currentValue: 12,
+      yourPrice: 39.9,
+      checkedAt: "2026-06-13T08:00:00",
+      unread: false,
+    },
+  ],
+  acc_2: [],
+  acc_3: [],
+  acc_4: [],
+};
+
+// ============================================================
+// CONFIGURAÇÃO DO MONITOR — informações sobre a rotina de 2h
+// ============================================================
+const MOCK_MONITOR_STATUS = {
+  acc_1: {
+    intervalHours: 2,
+    lastCheckAt: "2026-06-13T14:00:00",
+    nextCheckAt: "2026-06-13T16:00:00",
+    productsMonitored: 6,
+    competitorsTracked: 23,
+    alertsLast24h: 4,
+  },
+};
