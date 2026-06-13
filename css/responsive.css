@@ -83,3 +83,181 @@
     max-width: 90px;
   }
 }
+
+/*
+  responsive-iphone.css
+  ----------------------
+  Ajustes adicionais focados em iPhone:
+  - Evita zoom automático do iOS em inputs (font-size >= 16px)
+  - Respeita safe areas (notch e home indicator)
+  - Bottom-nav com 7 itens: reduz para caber sem cortar
+  - Scroll horizontal mais visível em tabelas largas
+  - Pequenos ajustes de toque (área mínima de 44px recomendada pela Apple)
+
+  INSTRUÇÕES: adicione ao FINAL de css/responsive.css
+*/
+
+/* ===================== EVITA ZOOM AUTOMÁTICO NO iOS ===================== */
+/* iOS dá zoom em inputs com font-size < 16px ao focar. Forçamos 16px
+   apenas em telas pequenas, sem alterar o visual no desktop. */
+@media (max-width: 768px) {
+  .input,
+  .select,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ===================== SAFE AREAS (notch / home indicator) ===================== */
+@media (max-width: 768px) {
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+    height: calc(var(--topbar-height) + env(safe-area-inset-top));
+  }
+
+  .bottom-nav {
+    height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .main {
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + var(--space-lg));
+  }
+}
+
+/* ===================== BOTTOM-NAV COM 7 ITENS ===================== */
+/* Com Catálogo + Marketing adicionados, ficaram 7 itens no menu
+   inferior. Reduzimos o tamanho do texto/ícone e o padding para
+   caber sem cortar, especialmente em iPhone SE (375px de largura). */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    justify-content: space-between;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .bottom-nav__item {
+    font-size: 0.95rem;
+    min-width: 0; /* permite encolher abaixo do conteúdo */
+    padding: 4px 0;
+  }
+
+  .bottom-nav__item small {
+    font-size: 0.55rem;
+    white-space: nowrap;
+  }
+}
+
+/* Em telas muito estreitas (iPhone SE, 375px), reduz mais ainda */
+@media (max-width: 390px) {
+  .bottom-nav__item {
+    font-size: 0.85rem;
+  }
+
+  .bottom-nav__item small {
+    font-size: 0.5rem;
+  }
+}
+
+/* ===================== TABELAS: INDICAÇÃO DE SCROLL ===================== */
+/* As tabelas novas (Catálogo, Top 5 concorrentes, Campanhas,
+   Monitor) têm muitas colunas. Em telas pequenas, adicionamos
+   sombra nas bordas para indicar que há conteúdo fora da tela. */
+@media (max-width: 768px) {
+  .table-scroll {
+    position: relative;
+    -webkit-overflow-scrolling: touch; /* scroll suave no iOS */
+  }
+
+  .table-scroll::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    background: linear-gradient(to right, transparent, var(--color-bg-elevated));
+    pointer-events: none;
+  }
+
+  .data-table {
+    font-size: 0.8rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+  }
+}
+
+/* ===================== ÁREA DE TOQUE MÍNIMA (44px) ===================== */
+/* Apple recomenda alvos de toque de pelo menos 44x44px */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-btn,
+  .user-pill {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nav-item,
+  .bottom-nav__item {
+    min-height: 44px;
+  }
+}
+
+/* ===================== PAINEL DE STATUS DO MONITOR (5 colunas) ===================== */
+/* monitor-status__grid já tem regra para 2 colunas em <768px,
+   mas em telas muito pequenas (iPhone SE) ainda fica apertado.
+   Reduz para 1 coluna abaixo de 390px. */
+@media (max-width: 390px) {
+  .monitor-status__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================== FORMULÁRIOS: BOTÕES EMPILHADOS ===================== */
+/* form-row (usado em Catálogo, Analisar, Marketing) empilha
+   input + select/botão verticalmente em telas pequenas, em vez
+   de espremer tudo na mesma linha. */
+@media (max-width: 480px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row .input,
+  .form-row .select,
+  .form-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ===================== CAMPANHAS: ITEM EXPANSÍVEL EM TELA PEQUENA ===================== */
+@media (max-width: 480px) {
+  .campaign-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+/* ===================== PREVINE OVERFLOW HORIZONTAL GERAL ===================== */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .main {
+    overflow-x: hidden;
+  }
+}
