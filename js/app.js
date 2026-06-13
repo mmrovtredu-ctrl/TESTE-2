@@ -4,20 +4,31 @@
   Ponto de entrada do dashboard. Aguarda o DOM carregar e
   inicializa todos os módulos, na ordem correta:
 
+  0. Verifica login (redireciona para login.html se não estiver logado)
   1. Navegação e seletor de conta (precisam existir primeiro,
      pois os outros módulos escutam o evento "accountChanged"
      e leem a conta selecionada).
   2. Cada view (overview, concorrentes, analisador, imagens,
      campanhas, precificação, alertas).
-
-  Também define o nome do usuário logado no avatar do topo —
-  em produção, isso viria dos dados de autenticação do usuário.
 */
 
-document.addEventListener("DOMContentLoaded", () => {
-  // ----- Usuário logado (placeholder) -----
-  // Em produção: pegar do sistema de autenticação (ex: Supabase Auth)
-  document.getElementById("userPill").textContent = "M";
+document.addEventListener("DOMContentLoaded", async () => {
+  // ----- Verifica login -----
+  // Se não houver sessão ativa, requireAuth() já redireciona para login.html
+  const user = await requireAuth();
+  if (!user) return; // interrompe a inicialização, já está saindo da página
+
+  // ----- Usuário logado -----
+  // Mostra a primeira letra do email no avatar do topo
+  const userPill = document.getElementById("userPill");
+  userPill.textContent = user.email.charAt(0).toUpperCase();
+
+  // Clique no avatar = logout
+  userPill.addEventListener("click", () => {
+    if (confirm("Deseja sair da sua conta?")) {
+      logout();
+    }
+  });
 
   // ----- Navegação e contas -----
   initNavigation();
@@ -27,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initOverview();
   initCompetitors();
   initAnalyzer();
+  initMarketing();
   initImages();
   initCampaigns();
   initPricing();
