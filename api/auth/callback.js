@@ -17,6 +17,13 @@ export default async function handler(req, res) {
     console.warn('Erro ao parsear state:', e);
   }
 
+  // .trim() em todas as variáveis para remover \n ou espaços acidentais
+  const clientId     = (process.env.ML_CLIENT_ID     || '').trim();
+  const clientSecret = (process.env.ML_CLIENT_SECRET || '').trim();
+  const redirectUri  = (process.env.ML_REDIRECT_URI  || '').trim();
+  const supabaseUrl  = (process.env.SUPABASE_URL     || '').trim();
+  const supabaseKey  = (process.env.SUPABASE_SERVICE_KEY || '').trim();
+
   try {
     // Troca code por token
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
@@ -24,10 +31,10 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.ML_CLIENT_ID,
-        client_secret: process.env.ML_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
-        redirect_uri: process.env.ML_REDIRECT_URI,
+        redirect_uri: redirectUri,
       }),
     });
 
@@ -41,12 +48,12 @@ export default async function handler(req, res) {
     const { access_token, refresh_token, expires_in, user_id } = tokenData;
 
     // Salva no Supabase
-    const saveRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/ml_accounts`, {
+    const saveRes = await fetch(`${supabaseUrl}/rest/v1/ml_accounts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_SERVICE_KEY,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
         'Prefer': 'resolution=merge-duplicates',
       },
       body: JSON.stringify({
