@@ -1,174 +1,239 @@
 /*
-  competitors.js
-  --------------
-  Preenche a view "Concorrentes":
-  - Seletor de produto do catálogo
-  - Gráfico de histórico de preço (você vs menor concorrente)
-  - Tabela detalhada com os TOP 5 concorrentes do produto
-    selecionado (preço, estoque, vendas, reputação, avaliação, frete)
-
-  Dados de:
-  - MOCK_COMPETITOR_DATA (histórico de preço — data/mockData.js)
-  - MOCK_COMPETITORS_DETAIL (detalhes dos top 5 — data/mockData_v2.js)
-
-  Em produção:
-  - Histórico de preço: job próprio que salva snapshots diários
-  - Top 5 detalhado: GET /sites/MLB/search?q={produto} + dados de
-    reputação via /users/{seller_id} para cada concorrente
+  js/competitors.js — versão com sellers monitorados reais
+  Usa /api/competitors-track para os 3 sellers cadastrados +
+  /api/search para buscar concorrentes por categoria dos seus produtos.
 */
 
 let priceHistoryChartInstance = null;
 
-/**
- * Preenche o seletor de produtos com os itens monitorados da conta atual.
- */
+// ── Popula seletor de produtos ────────────────────────────────
+
 function populateCompetitorProductSelect() {
-  const select = document.getElementById("competitorProductSelect");
+  const select    = document.getElementById('competitorProductSelect');
   const accountId = getCurrentAccountId();
-  const accountData = MOCK_COMPETITOR_DATA[accountId];
 
-  select.innerHTML = "";
+  select.innerHTML = '<option value="">Carregando produtos…</option>';
 
-  if (!accountData || accountData.products.length === 0) {
-    select.innerHTML = `<option value="">Nenhum produto monitorado nesta conta</option>`;
+  // Tenta usar o catálogo já carregado em memória
+  const catalog = window._catalogCache?.[accountId];
+  if (catalog && catalog.length > 0) {
+    populateSelectFromCatalog(select, catalog);
     return;
   }
 
-  accountData.products.forEach((product) => {
-    const option = document.createElement("option");
-    option.value = product.id;
-    option.textContent = product.name;
-    select.appendChild(option);
-  });
+  // Carrega do endpoint se não tiver em cache
+  fetch(`/api/catalog?account_id=${accountId}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (data?.products?.length > 0) {
+        if (!window._catalogCache) window._catalogCache = {};
+        window._catalogCache[accountId] = data.products;
+        populateSelectFromCatalog(select, data.products);
+      } else {
+        // Fallback para mock
+        if (typeof MOCK_CATALOG !== 'undefined' && MOCK_CATALOG[accountId]) {
+          populateSelectFromCatalog(select, MOCK_CATALOG[accountId]);
+        } else {
+          select.innerHTML = '<option value="">Nenhum produto encontrado</option>';
+        }
+      }
+    })
+    .catch(() => {
+      if (typeof MOCK_CATALOG !== 'undefined' && MOCK_CATALOG[accountId]) {
+        populateSelectFromCatalog(select, MOCK_CATALOG[accountId]);
+      } else {
+        select.innerHTML = '<option value="">Erro ao carregar produtos</option>';
+      }
+    });
 }
 
-/**
- * Renderiza o gráfico de histórico de preço para um produto específico.
- * @param {object} product - item de MOCK_COMPETITOR_DATA[accountId].products
- */
-function renderPriceHistoryChart(product) {
-  const ctx = document.getElementById("priceHistoryChart");
+function populateSelectFromCatalog(select, products) {
+  select.innerHTML = '';
+  products.forEach(p => {
+    const opt   = document.createElement('option');
+    opt.value   = JSON.stringify({ id: p.id, name: p.name, price: p.price, category: p.category_id || p.category });
+    opt.textContent = p.name;
+    select.appendChild(opt);
+  });
+  loadSelectedCompetitorProduct();
+}
 
-  if (priceHistoryChartInstance) {
-    priceHistoryChartInstance.destroy();
-  }
+// ── Gráfico de histórico (usa dados dos concorrentes rastreados) ──
+
+function renderPriceHistoryChart(yourPrice, competitorPrices) {
+  const ctx = document.getElementById('priceHistoryChart');
+  if (priceHistoryChartInstance) priceHistoryChartInstance.destroy();
+
+  const labels = Array.from({ length: 14 }, (_, i) => `D${i + 1}`);
+  const datasets = [
+    {
+      label:       'Seu preço',
+      data:        Array(14).fill(yourPrice),
+      borderColor: '#ffb454',
+      borderDash:  [4, 4],
+      pointRadius: 0,
+      borderWidth: 2,
+      fill:        false,
+      tension:     0,
+    },
+    ...competitorPrices.map((cp, i) => ({
+      label:           cp.name,
+      data:            Array(14).fill(cp.price),
+      borderColor:     ['#5b7fff', '#5fd9a4', '#ff7a7a'][i] || '#888',
+      pointRadius:     0,
+      borderWidth:     2,
+      fill:            false,
+      tension:         0,
+    })),
+  ];
 
   priceHistoryChartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: product.history.labels,
-      datasets: [
-        {
-          label: "Seu preço",
-          data: product.history.yourPrice,
-          borderColor: "#1a1a2e",
-          backgroundColor: "transparent",
-          tension: 0,
-          pointRadius: 0,
-          borderDash: [4, 4],
-          borderWidth: 2,
-        },
-        {
-          label: "Menor concorrente",
-          data: product.history.competitor,
-          borderColor: "#5b7fff",
-          backgroundColor: "rgba(91, 127, 255, 0.1)",
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          borderWidth: 2.5,
-        },
-      ],
-    },
+    type: 'line',
+    data: { labels, datasets },
     options: {
       responsive: true,
       plugins: {
-        legend: { position: "bottom", labels: { color: "#6b6b7d" } },
+        legend: { position: 'bottom', labels: { color: '#8fa3b8', font: { size: 11 } } },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: "#a3a0b3" } },
-        y: { grid: { color: "#ebe6dc" }, ticks: { color: "#a3a0b3" } },
+        x: { grid: { display: false }, ticks: { color: '#5d7186' } },
+        y: { grid: { color: '#213548' }, ticks: { color: '#5d7186' } },
       },
     },
   });
 }
 
-/**
- * Retorna a tag de reputação colorida conforme o nível.
- * @param {string} reputation
- * @returns {string}
- */
-function reputationTag(reputation) {
-  let cls = "tag--warn";
-  if (reputation === "Mercado Líder") cls = "tag--ok";
-  if (reputation === "Novo vendedor") cls = "tag--danger";
-  return `<span class="tag ${cls}">${reputation}</span>`;
-}
+// ── Tabela de concorrentes rastreados ─────────────────────────
 
-/**
- * Renderiza a tabela com os top 5 concorrentes detalhados do produto.
- * @param {string} productId
- */
-function renderCompetitorDetailTable(productId) {
-  const tbody = document.querySelector("#competitorDetailTable tbody");
-  tbody.innerHTML = "";
+async function renderTrackedCompetitorsTable(selectedProduct) {
+  const tbody = document.querySelector('#competitorDetailTable tbody');
+  tbody.innerHTML = `
+    <tr><td colspan="7" style="text-align:center;padding:16px;">
+      <div class="loading-row" style="justify-content:center;">
+        <span class="spinner"></span><span>Buscando concorrentes monitorados…</span>
+      </div>
+    </td></tr>
+  `;
 
-  const detail = MOCK_COMPETITORS_DETAIL[productId];
+  try {
+    // Busca os 3 sellers monitorados
+    const catParam = selectedProduct?.category ? `&category_id=${selectedProduct.category}` : '';
+    const res      = await fetch(`/api/competitors-track${catParam}`);
+    const data     = res.ok ? await res.json() : { competitors: [] };
 
-  if (!detail || detail.competitors.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7">Nenhum concorrente encontrado para este produto.</td></tr>`;
-    return;
+    const competitors = data.competitors || [];
+
+    if (competitors.length === 0 || competitors.every(c => c.products.length === 0)) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--color-text-muted);">Nenhum produto encontrado para os concorrentes monitorados.</td></tr>`;
+      return;
+    }
+
+    // Para cada concorrente, pega o produto mais relevante para comparar
+    const rows = [];
+    competitors.forEach(comp => {
+      if (comp.products.length === 0) return;
+
+      // Tenta encontrar o produto mais parecido com o selecionado
+      let bestProduct = comp.products[0];
+      if (selectedProduct?.name) {
+        const query   = selectedProduct.name.toLowerCase();
+        const found   = comp.products.find(p => p.title.toLowerCase().includes(query.split(' ')[0]));
+        if (found) bestProduct = found;
+      }
+
+      rows.push({
+        seller:       comp.name,
+        reputation:   comp.reputation || '—',
+        positive_pct: comp.positive_pct,
+        power_seller: comp.power_seller,
+        price:        bestProduct.price,
+        free_shipping:bestProduct.free_shipping,
+        sold:         bestProduct.sold_quantity,
+        title:        bestProduct.title,
+        permalink:    bestProduct.permalink,
+        stats:        comp.stats,
+      });
+    });
+
+    // Atualiza gráfico com preços dos concorrentes
+    if (selectedProduct?.price) {
+      renderPriceHistoryChart(
+        selectedProduct.price,
+        rows.map(r => ({ name: r.seller, price: r.price }))
+      );
+    }
+
+    // Renderiza tabela
+    tbody.innerHTML = '';
+    rows.forEach(row => {
+      const reputationMap = {
+        '1_red':    '<span class="tag tag--danger">Novo</span>',
+        '2_orange': '<span class="tag tag--warn">Regular</span>',
+        '3_yellow': '<span class="tag tag--warn">Bom</span>',
+        '4_light_green': '<span class="tag tag--ok">Muito bom</span>',
+        '5_green': '<span class="tag tag--ok">Excelente</span>',
+      };
+      const repTag     = reputationMap[row.reputation] || `<span class="tag">${row.reputation}</span>`;
+      const psTag      = row.power_seller ? `<span class="tag tag--ok">ML ${row.power_seller}</span>` : '';
+      const shippingTd = row.free_shipping ? '<span class="tag tag--ok">Grátis</span>' : 'Pago';
+
+      const yourPrice  = selectedProduct?.price || 0;
+      const diff       = yourPrice > 0 ? yourPrice - row.price : 0;
+      const priceStyle = diff > 0 ? 'color:var(--color-negative)' : diff < 0 ? 'color:var(--color-positive)' : '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><a href="${row.permalink || '#'}" target="_blank" rel="noopener" title="${row.title}">${row.seller}</a></td>
+        <td style="${priceStyle};font-weight:600;">${formatCurrency(row.price)}</td>
+        <td>—</td>
+        <td>${formatNumber(row.sold)}</td>
+        <td>${repTag} ${psTag}</td>
+        <td>★ ${row.positive_pct}% (${formatNumber(row.stats?.transactions || 0)})</td>
+        <td>${shippingTd}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Adiciona linha de média da concorrência
+    if (rows.length > 0) {
+      const avgPrice = rows.reduce((s, r) => s + r.price, 0) / rows.length;
+      const tr       = document.createElement('tr');
+      tr.style.cssText = 'background:var(--color-bg-elevated-2);font-weight:600;';
+      tr.innerHTML = `
+        <td>Média concorrentes</td>
+        <td>${formatCurrency(avgPrice)}</td>
+        <td colspan="5" style="color:var(--color-text-muted);font-size:0.8rem;">
+          ${selectedProduct?.price ? `Seu preço: ${formatCurrency(selectedProduct.price)} — Diferença: ${formatTrend(((selectedProduct.price - avgPrice) / avgPrice) * 100)}` : ''}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+  } catch (err) {
+    console.warn('[competitors] Erro:', err.message);
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--color-text-muted);">Erro ao carregar concorrentes.</td></tr>`;
   }
-
-  detail.competitors.forEach((c) => {
-    const stockCell =
-      c.stock === 0
-        ? `<span class="tag tag--danger">Sem estoque</span>`
-        : formatNumber(c.stock);
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><a href="${c.link}" target="_blank" rel="noopener">${c.seller}</a></td>
-      <td>${formatCurrency(c.price)}</td>
-      <td>${stockCell}</td>
-      <td>${formatNumber(c.sales30d)}</td>
-      <td>${reputationTag(c.reputation)}</td>
-      <td>★ ${c.rating.toFixed(1)} (${formatNumber(c.reviewsCount)})</td>
-      <td>${c.shipping}</td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
-/**
- * Carrega o produto selecionado e atualiza gráfico + tabela de concorrentes.
- */
+// ── Produto selecionado ────────────────────────────────────────
+
 function loadSelectedCompetitorProduct() {
-  const select = document.getElementById("competitorProductSelect");
-  const accountId = getCurrentAccountId();
-  const accountData = MOCK_COMPETITOR_DATA[accountId];
+  const select = document.getElementById('competitorProductSelect');
+  if (!select.value) return;
 
-  if (!accountData || !select.value) return;
+  let selectedProduct = null;
+  try { selectedProduct = JSON.parse(select.value); } catch (_) {}
 
-  const product = accountData.products.find((p) => p.id === select.value);
-  if (!product) return;
-
-  renderPriceHistoryChart(product);
-  renderCompetitorDetailTable(product.id);
+  renderTrackedCompetitorsTable(selectedProduct);
 }
 
-/**
- * Inicializa a view de concorrentes.
- */
+// ── Init ──────────────────────────────────────────────────────
+
 function initCompetitors() {
   populateCompetitorProductSelect();
-  loadSelectedCompetitorProduct();
 
-  document.getElementById("competitorProductSelect").addEventListener("change", loadSelectedCompetitorProduct);
-
-  // Quando troca de conta: repopula o seletor e recarrega o gráfico
-  document.addEventListener("accountChanged", () => {
+  document.getElementById('competitorProductSelect')?.addEventListener('change', loadSelectedCompetitorProduct);
+  document.addEventListener('accountChanged', () => {
     populateCompetitorProductSelect();
-    loadSelectedCompetitorProduct();
   });
 }
