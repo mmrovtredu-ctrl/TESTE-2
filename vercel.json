@@ -1,16 +1,20 @@
-
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
     }
-  ],
-  "rewrites": [
+  },
+  "routes": [
     {
-      "source": "/auth/callback",
-      "destination": "/api/auth/callback"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
