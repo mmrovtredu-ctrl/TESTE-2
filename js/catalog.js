@@ -1,87 +1,65 @@
 /*
-  catalog.js
-  ----------
-  Preenche a view "Catálogo":
-  - KPIs resumidos (ativos, sem estoque, vendas, saúde média)
-  - Tabela completa de produtos cadastrados na conta ML
-  - Busca por nome/categoria e filtro por status
-
-  Dados de MOCK_CATALOG[accountId] (data/mockData_v2.js).
-  Em produção: GET /users/{user_id}/items/search + /items/{id}
-  para cada produto (ou em lote via /items?ids=).
+  js/catalog.js — versão REAL (sem mock)
+  Chama /api/catalog?account_id=X e exibe os produtos reais do ML.
 */
 
 let catalogData = [];
 
-/**
- * Calcula e renderiza os KPIs resumidos do catálogo.
- * @param {object[]} products
- */
 function renderCatalogKpis(products) {
-  const active = products.filter((p) => p.status === "ativo").length;
-  const outOfStock = products.filter((p) => p.status === "sem_estoque" || p.stock === 0).length;
-  const totalSales = products.reduce((sum, p) => sum + p.sales30d, 0);
-  const avgHealth = products.length
-    ? Math.round(products.reduce((sum, p) => sum + p.health, 0) / products.length)
+  const active     = products.filter(p => p.status === 'ativo').length;
+  const outOfStock = products.filter(p => p.status === 'sem_estoque' || p.stock === 0).length;
+  const totalSales = products.reduce((s, p) => s + (p.sales30d || 0), 0);
+  const avgHealth  = products.length
+    ? Math.round(products.reduce((s, p) => s + (p.health || 0), 0) / products.length)
     : 0;
 
-  document.getElementById("catalogActiveCount").textContent = active;
-  document.getElementById("catalogOutOfStockCount").textContent = outOfStock;
-  document.getElementById("catalogTotalSales").textContent = formatNumber(totalSales);
-  document.getElementById("catalogAvgHealth").textContent = avgHealth + "%";
+  document.getElementById('catalogActiveCount').textContent     = active;
+  document.getElementById('catalogOutOfStockCount').textContent = outOfStock;
+  document.getElementById('catalogTotalSales').textContent      = formatNumber(totalSales);
+  document.getElementById('catalogAvgHealth').textContent       = avgHealth + '%';
 }
 
-/**
- * Retorna a tag de status formatada.
- * @param {string} status
- * @returns {string}
- */
 function catalogStatusTag(status) {
   const map = {
-    ativo: { label: "Ativo", cls: "tag--ok" },
-    sem_estoque: { label: "Sem estoque", cls: "tag--danger" },
-    pausado: { label: "Pausado", cls: "tag--warn" },
+    ativo:       { label: 'Ativo',       cls: 'tag--ok'     },
+    sem_estoque: { label: 'Sem estoque', cls: 'tag--danger' },
+    pausado:     { label: 'Pausado',     cls: 'tag--warn'   },
+    encerrado:   { label: 'Encerrado',   cls: ''            },
+    under_review:{ label: 'Em análise',  cls: 'tag--warn'   },
   };
-  const info = map[status] || { label: status, cls: "" };
+  const info = map[status] || { label: status, cls: '' };
   return `<span class="tag ${info.cls}">${info.label}</span>`;
 }
 
-/**
- * Retorna a tag de saúde do anúncio, colorida pela faixa.
- * @param {number} health
- * @returns {string}
- */
 function catalogHealthTag(health) {
-  let cls = "tag--ok";
-  if (health < 60) cls = "tag--danger";
-  else if (health < 80) cls = "tag--warn";
-  return `<span class="tag ${cls}">${health}%</span>`;
+  if (!health || health <= 0) return '—';
+  const pct = health <= 1 ? Math.round(health * 100) : Math.round(health);
+  const cls = pct < 60 ? 'tag--danger' : pct < 80 ? 'tag--warn' : 'tag--ok';
+  return `<span class="tag ${cls}">${pct}%</span>`;
 }
 
-/**
- * Renderiza a tabela do catálogo com os produtos filtrados.
- * @param {object[]} products
- */
 function renderCatalogTable(products) {
-  const tbody = document.querySelector("#catalogTable tbody");
-  tbody.innerHTML = "";
-
-  document.getElementById("catalogResultCount").textContent = `${products.length} produto(s)`;
+  const tbody = document.querySelector('#catalogTable tbody');
+  tbody.innerHTML = '';
+  document.getElementById('catalogResultCount').textContent = `${products.length} produto(s)`;
 
   if (products.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8">Nenhum produto encontrado.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-text-muted);">Nenhum produto encontrado.</td></tr>`;
     return;
   }
 
-  products.forEach((p) => {
-    const tr = document.createElement("tr");
+  products.forEach(p => {
+    const tr  = document.createElement('tr');
+    const img = p.thumbnail
+      ? `<img src="${p.thumbnail}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:4px;margin-right:8px;vertical-align:middle;">`
+      : '';
     tr.innerHTML = `
-      <td>${p.name}</td>
-      <td>${p.category}</td>
+      <td>${img}${p.name}</td>
+      <td>${p.category || '—'}</td>
       <td>${formatCurrency(p.price)}</td>
       <td>${p.stock === 0 ? '<span class="tag tag--danger">0</span>' : formatNumber(p.stock)}</td>
-      <td>${formatNumber(p.sales30d)}</td>
-      <td>${formatNumber(p.visits30d)}</td>
+      <td>${formatNumber(p.sales30d || 0)}</td>
+      <td>${formatNumber(p.visits30d || 0)}</td>
       <td>${catalogHealthTag(p.health)}</td>
       <td>${catalogStatusTag(p.status)}</td>
     `;
@@ -89,48 +67,83 @@ function renderCatalogTable(products) {
   });
 }
 
-/**
- * Aplica os filtros de busca e status sobre o catálogo da conta atual.
- */
 function applyCatalogFilters() {
-  const query = document.getElementById("catalogSearchInput").value.trim().toLowerCase();
-  const statusFilter = document.getElementById("catalogStatusFilter").value;
+  const query  = document.getElementById('catalogSearchInput').value.trim().toLowerCase();
+  const status = document.getElementById('catalogStatusFilter').value;
 
   let filtered = catalogData;
-
-  if (query) {
-    filtered = filtered.filter(
-      (p) => p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query)
-    );
-  }
-
-  if (statusFilter) {
-    filtered = filtered.filter((p) => p.status === statusFilter);
-  }
+  if (query)  filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query));
+  if (status) filtered = filtered.filter(p => p.status === status);
 
   renderCatalogTable(filtered);
 }
 
-/**
- * Carrega o catálogo da conta selecionada e renderiza tudo.
- */
-function loadCatalog() {
+async function loadCatalog() {
   const accountId = getCurrentAccountId();
-  catalogData = MOCK_CATALOG[accountId] || [];
 
-  renderCatalogKpis(catalogData);
-  applyCatalogFilters();
+  // Estado de carregamento
+  ['catalogActiveCount','catalogOutOfStockCount','catalogTotalSales','catalogAvgHealth']
+    .forEach(id => { document.getElementById(id).textContent = '…'; });
+  document.getElementById('catalogResultCount').textContent = '…';
+  document.querySelector('#catalogTable tbody').innerHTML = `
+    <tr><td colspan="8" style="text-align:center;padding:32px;">
+      <div class="loading-row" style="justify-content:center;">
+        <span class="spinner"></span>
+        <span>Carregando catálogo do Mercado Livre…</span>
+      </div>
+    </td></tr>`;
+
+  try {
+    const res  = await fetch(`/api/catalog?account_id=${accountId}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (data.not_connected) {
+        showCatalogNotConnected(accountId);
+        return;
+      }
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    catalogData = data.products || [];
+
+    // Salva em cache para o módulo de concorrentes usar
+    if (!window._catalogCache) window._catalogCache = {};
+    window._catalogCache[accountId] = catalogData;
+
+    renderCatalogKpis(catalogData);
+    applyCatalogFilters();
+
+  } catch (err) {
+    console.warn('[catalog] API falhou:', err.message);
+    document.querySelector('#catalogTable tbody').innerHTML = `
+      <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-text-muted);">
+        Erro ao carregar catálogo. Verifique a conexão da conta.
+      </td></tr>`;
+    ['catalogActiveCount','catalogOutOfStockCount','catalogTotalSales','catalogAvgHealth']
+      .forEach(id => { document.getElementById(id).textContent = '—'; });
+  }
 }
 
-/**
- * Inicializa a view de catálogo.
- */
+function showCatalogNotConnected(accountId) {
+  const accounts = window._mlAccounts || [];
+  const account  = accounts.find(a => a.account_id === accountId);
+  const name     = account?.account_name || accountId;
+
+  ['catalogActiveCount','catalogOutOfStockCount','catalogTotalSales','catalogAvgHealth']
+    .forEach(id => { document.getElementById(id).textContent = '—'; });
+  document.getElementById('catalogResultCount').textContent = '—';
+  document.querySelector('#catalogTable tbody').innerHTML = `
+    <tr><td colspan="8" style="text-align:center;padding:24px;">
+      ⚠️ A loja <strong>${name}</strong> ainda não está conectada.<br>
+      <span style="font-size:0.85rem;color:var(--color-text-muted)">Clique em "🔗 Conectar ML" no topo.</span>
+    </td></tr>`;
+}
+
 function initCatalog() {
   loadCatalog();
-
-  document.getElementById("refreshCatalog").addEventListener("click", loadCatalog);
-  document.getElementById("catalogSearchInput").addEventListener("input", applyCatalogFilters);
-  document.getElementById("catalogStatusFilter").addEventListener("change", applyCatalogFilters);
-
-  document.addEventListener("accountChanged", loadCatalog);
+  document.getElementById('refreshCatalog').addEventListener('click', loadCatalog);
+  document.getElementById('catalogSearchInput').addEventListener('input', applyCatalogFilters);
+  document.getElementById('catalogStatusFilter').addEventListener('change', applyCatalogFilters);
+  document.addEventListener('accountChanged', loadCatalog);
 }
