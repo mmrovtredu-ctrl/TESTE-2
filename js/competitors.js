@@ -38,11 +38,11 @@ function ensureCompetitorLinkBar() {
   // Usa .form-row/.input/.btn — já responsivos (empilham no mobile, toque 44px)
   bar.innerHTML = `
     <label class="form-hint" style="display:block;margin-bottom:8px;">
-      Cole o link de um produto do Mercado Livre para ver a concorrência
+      Cole o link do <strong>catálogo</strong> (/p/MLB...) ou de um <strong>anúncio</strong> (MLB-...) do Mercado Livre
     </label>
     <div class="form-row">
       <input id="competitorLinkInput" type="text" class="input"
-        placeholder="https://www.mercadolivre.com.br/.../p/MLB..." />
+        placeholder="Link do catálogo ou do anúncio (ex: .../p/MLB... ou .../MLB-...)" />
       <button id="competitorLinkBtn" class="btn btn--primary">Buscar concorrentes</button>
     </div>
     <div id="competitorProductHeader"></div>
