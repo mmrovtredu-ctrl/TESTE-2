@@ -1,5 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/auth/callback", "destination": "/api/auth/callback" }
-  ]
+  ],
+  "functions": {
+    "api/marketing.js": { "maxDuration": 60 },
+    "api/analyze.js": { "maxDuration": 60 }
+  }
 }
