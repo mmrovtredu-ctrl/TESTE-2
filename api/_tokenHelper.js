@@ -1,25 +1,13 @@
 // api/_tokenHelper.js
 // ─────────────────────────────────────────────────────────────
-// Funções reutilizáveis de autenticação para os 4 tokens ML.
-//
-// COMO FUNCIONA:
-// Cada uma das 4 contas (acc_1..acc_4) tem seu próprio par
-// access_token / refresh_token no Supabase.
-// - getAccountToken()   → lê o token de uma conta
-// - ensureFreshToken()  → renova automaticamente se estiver
-//                         a menos de 5 min de expirar
-// - getTokenForAccount()→ atalho: lê + renova em uma chamada
-//
-// USO em qualquer api/*.js:
-//   import { getTokenForAccount } from './_tokenHelper.js';
-//   const token = await getTokenForAccount(account_id);
-//   if (!token) return res.status(401).json({ not_connected: true });
+// Funções de autenticação para os tokens ML.
+// AGORA MULTI-APP: cada conta renova o token com o SEU app.
 // ─────────────────────────────────────────────────────────────
+
+import { getAppCredentials } from './_mlApps.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY?.trim();
-const ML_CLIENT_ID = process.env.ML_CLIENT_ID?.trim();
-const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET?.trim();
 
 // ─── Busca dados do token da conta no Supabase ───────────────
 export async function getAccountToken(accountId) {
@@ -50,8 +38,6 @@ export async function getAccountToken(accountId) {
 }
 
 // ─── Garante que o access_token está válido ──────────────────
-// Se estiver a menos de 5 minutos de expirar, renova via
-// refresh_token antes de devolver.
 export async function ensureFreshToken(token, accountId) {
   if (!token?.access_token) return null;
 
@@ -62,7 +48,13 @@ export async function ensureFreshToken(token, accountId) {
 
   if (!isExpired) return token.access_token;
 
-  // Token próximo de expirar — faz refresh
+  // Precisa do app DESTA conta para renovar
+  const app = getAppCredentials(accountId);
+  if (!app) {
+    console.error(`[tokenHelper] Sem credenciais de app para ${accountId}.`);
+    return token.access_token;
+  }
+
   console.log(`[tokenHelper] Renovando token para ${accountId}…`);
 
   const refreshRes = await fetch('https://api.mercadolibre.com/oauth/token', {
@@ -70,23 +62,20 @@ export async function ensureFreshToken(token, accountId) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type:    'refresh_token',
-      client_id:     ML_CLIENT_ID,
-      client_secret: ML_CLIENT_SECRET,
+      client_id:     app.clientId,
+      client_secret: app.clientSecret,
       refresh_token: token.refresh_token,
     }),
   });
 
   if (!refreshRes.ok) {
-    const err = await refreshRes.json();
+    const err = await refreshRes.json().catch(() => ({}));
     console.error(`[tokenHelper] Refresh falhou para ${accountId}:`, err);
-    // Devolve o token antigo — a chamada à API do ML vai falhar com 401
-    // e o usuário vai precisar reconectar
     return token.access_token;
   }
 
   const refreshData = await refreshRes.json();
 
-  // Persiste o novo token no Supabase
   await fetch(
     `${SUPABASE_URL}/rest/v1/ml_accounts?account_id=eq.${accountId}`,
     {
@@ -110,8 +99,6 @@ export async function ensureFreshToken(token, accountId) {
 }
 
 // ─── Atalho: lê + renova em uma chamada ──────────────────────
-// Retorna null se a conta não estiver conectada.
-// Retorna string (access_token válido) se OK.
 export async function getTokenForAccount(accountId) {
   const token = await getAccountToken(accountId);
   if (!token) return null;
