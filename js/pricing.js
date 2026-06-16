@@ -7,6 +7,10 @@
   - Estima vendas/mês com base em uma fórmula simples
     (substitua pela lógica real quando tiver histórico de categoria)
 
+  IMPORTANTE: o cálculo agora roda SOMENTE quando o usuário clica
+  no botão "Calcular preço" (id="pCalcBtn"). Não recalcula mais a
+  cada tecla digitada.
+
   FÓRMULA DE PREÇO:
   custoTotal = custoProduto + frete
   Para garantir a margem desejada sobre o preço de venda, considerando
@@ -99,13 +103,23 @@ function updatePricingResult() {
 }
 
 /**
- * Inicializa a view de precificação: recalcula a cada alteração nos campos.
+ * Inicializa a view de precificação: calcula SOMENTE quando o
+ * usuário clica no botão "Calcular preço".
  */
 function initPricing() {
+  const btn = document.getElementById("pCalcBtn");
+
+  // Calcula ao clicar no botão
+  if (btn) btn.addEventListener("click", updatePricingResult);
+
+  // Atalho: também calcula se apertar Enter em qualquer campo do formulário
   const form = document.getElementById("pricingForm");
-
-  form.addEventListener("input", updatePricingResult);
-
-  // Calcula uma vez com os valores padrão ao carregar
-  updatePricingResult();
+  if (form) {
+    form.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        updatePricingResult();
+      }
+    });
+  }
 }
