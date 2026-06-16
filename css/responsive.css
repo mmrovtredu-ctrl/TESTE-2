@@ -7,6 +7,8 @@
     ocupa uma linha própria embaixo (não estoura mais para os lados).
   - As tabelas largas ganham PRIMEIRA COLUNA FIXA + rolagem suave, então
     você sempre enxerga o nome do produto enquanto desliza o resto.
+  - A tabela de CONCORRENTES vira "cards" no celular (cada vendedor num
+    bloco), e continua tabela normal no PC.
   - Formulários, cards de busca e a barra de "colar link" empilham.
   - Alvos de toque de no mínimo 44px (recomendação da Apple).
   - Respeito a safe areas do iPhone (notch / home indicator).
@@ -161,11 +163,6 @@
 
 /* ============================================================
    AJUSTES FOCADOS EM iPhone
-   - Evita zoom automático do iOS em inputs (font-size >= 16px)
-   - Respeita safe areas (notch e home indicator)
-   - Bottom-nav com 7 itens: reduz para caber sem cortar
-   - Scroll horizontal mais visível em tabelas largas
-   - Área de toque mínima (44px)
    ============================================================ */
 
 /* ----- Evita zoom automático no iOS ao focar inputs ----- */
@@ -227,7 +224,7 @@
 }
 
 /* ============================================================
-   TABELAS NO MOBILE
+   TABELAS NO MOBILE (genérico)
    - Primeira coluna FIXA ao rolar (você sempre vê o produto/vendedor)
    - Rolagem horizontal suave com sombra indicando "tem mais ao lado"
    - Fontes e padding compactos
@@ -258,7 +255,7 @@
   .data-table th,
   .data-table td {
     padding: 9px 10px;
-    white-space: nowrap; /* evita quebra estranha; o scroll cuida do resto */
+    white-space: nowrap; /* o scroll cuida do resto */
   }
 
   /* PRIMEIRA COLUNA FIXA (nome do produto / vendedor) */
@@ -268,7 +265,6 @@
     left: 0;
     z-index: 1;
     background: var(--color-bg-elevated);
-    /* leve divisória para destacar a coluna fixa do conteúdo que rola */
     box-shadow: 1px 0 0 var(--color-border);
     max-width: 160px;
     overflow: hidden;
@@ -277,6 +273,90 @@
 
   .data-table th:first-child {
     z-index: 2;
+  }
+}
+
+/* ============================================================
+   CONCORRENTES NO MOBILE — tabela vira CARDS (até 640px)
+   ------------------------------------------------------------
+   Cada vendedor vira um bloco com "rótulo: valor" em cada linha.
+   No PC (acima de 640px) continua tabela normal.
+   ============================================================ */
+@media (max-width: 640px) {
+  /* desliga o cabeçalho da tabela e o layout de tabela */
+  #competitorDetailTable,
+  #competitorDetailTable tbody,
+  #competitorDetailTable tr,
+  #competitorDetailTable td {
+    display: block;
+    width: 100%;
+  }
+
+  #competitorDetailTable thead {
+    display: none;
+  }
+
+  #competitorDetailTable {
+    min-width: 0;
+  }
+
+  /* cada linha (vendedor) vira um card */
+  #competitorDetailTable tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    margin-bottom: 10px;
+    padding: 4px 0;
+    overflow: hidden;
+  }
+
+  /* cada célula vira "rótulo: valor" */
+  #competitorDetailTable td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    padding: 9px 12px;
+    white-space: normal;
+    /* cancela a 1ª-coluna-fixa do bloco genérico acima */
+    position: static;
+    box-shadow: none;
+    max-width: none;
+    overflow: visible;
+  }
+
+  #competitorDetailTable td:last-child {
+    border-bottom: 0;
+  }
+
+  /* o rótulo da coluna, à esquerda */
+  #competitorDetailTable td::before {
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* a 1ª célula (vendedor) em destaque, ocupando a largura toda */
+  #competitorDetailTable td[data-label="Vendedor"] {
+    background: var(--color-bg-elevated);
+    font-weight: 600;
+  }
+
+  /* linha de média da concorrência: vira um card de resumo */
+  #competitorDetailTable .competitor-avg-row {
+    background: var(--color-bg-elevated-2);
+    border-color: var(--color-accent-strong);
+  }
+
+  #competitorDetailTable .competitor-avg-row td {
+    background: transparent;
   }
 }
 
@@ -302,24 +382,7 @@
 }
 
 /* ============================================================
-   BARRA "COLAR LINK" (Concorrentes) — injetada via JS
-   Empilha input + botão e deixa o botão largura cheia.
-   ============================================================ */
-@media (max-width: 480px) {
-  #competitorLinkBar > div {
-    flex-direction: column;
-  }
-
-  #competitorLinkInput,
-  #competitorLinkBtn {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-}
-
-/* ============================================================
    CARDS DE BUSCA (Analisar / Marketing) — injetados via JS
-   Garante que não estourem a largura em telas estreitas.
    ============================================================ */
 @media (max-width: 480px) {
   #analyzerSearchGrid > div,
@@ -341,7 +404,6 @@
 
 /* ============================================================
    GRÁFICOS (Chart.js) — limita a altura no mobile
-   para não dominarem a tela.
    ============================================================ */
 @media (max-width: 768px) {
   .panel canvas {
@@ -351,7 +413,6 @@
 
 /* ============================================================
    PAINEL DE STATUS DO MONITOR (5 colunas)
-   2 colunas no mobile, 1 em telas minúsculas.
    ============================================================ */
 @media (max-width: 768px) {
   .monitor-status__grid {
@@ -397,7 +458,6 @@
     min-height: 44px;
   }
 
-  /* Linhas clicáveis (campanhas) com altura de toque confortável */
   .campaign-row td {
     padding-top: 12px;
     padding-bottom: 12px;
