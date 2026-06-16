@@ -1,32 +1,46 @@
 // api/competitors-track.js
 // ─────────────────────────────────────────────────────────────
-// CONCORRENTES POR LINK DO PRODUTO
-// Recebe ?link= (ou ?product=) com um link/ID do Mercado Livre e
-// devolve: o produto colado (em cima) + os vendedores concorrentes
-// que vendem o MESMO produto (embaixo).
-// Usa o TOKEN de uma conta conectada (a busca pública do ML sem
-// token deixou de funcionar). Tenta a conta pedida; se ela não
-// estiver conectada, usa qualquer conta conectada.
+// CONCORRENTES POR LINK DO PRODUTO — aceita TANTO catálogo QUANTO
+// anúncio individual (e ID puro).
+//
+// Fluxo:
+//   1) Tenta resolver o que foi colado como ANÚNCIO (/items/{id})
+//      e como PRODUTO DE CATÁLOGO (/products/{id}), na ordem mais
+//      provável conforme o formato do link, mas com fallback cruzado.
+//   2) Se o anúncio pertence a um catálogo (catalog_product_id),
+//      pivota para o catálogo e lista TODOS os vendedores daquele
+//      produto (a concorrência real).
+//   3) Se não houver catálogo (anúncio avulso), busca por título e
+//      mostra concorrentes de produtos similares.
+//
+// Usa o TOKEN de uma conta conectada (a busca pública sem token
+// deixou de funcionar). Tenta a conta pedida; senão, qualquer uma.
 // ─────────────────────────────────────────────────────────────
 
 import { getTokenForAccount } from './_tokenHelper.js';
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
+const API  = 'https://api.mercadolibre.com';
 const SITE = 'MLB';
 
-// ── Extrai o ID do ML de um link ou texto ─────────────────────
+// ── Extrai o ID do ML de um link, ID ou texto ─────────────────
 // Suporta:
-//   catálogo:  .../p/MLB26986602         -> { id:'MLB26986602', kind:'product' }
-//   anúncio:   .../MLB-2075324636-...     -> { id:'MLB2075324636', kind:'item' }
-//   ID cru:    MLB26986602 / MLB2075324636
+//   catálogo:  .../p/MLB26986602            -> { id, kind:'product' }
+//   anúncio:   .../MLB-2075324636-...        -> { id, kind:'item' }
+//   query:     ...item_id=MLB2075324636      -> { id, kind:'item' }
+//   ID cru:    MLB26986602 / MLB2075324636   -> { id, kind:'unknown' }
 function parseMlId(raw) {
   if (!raw) return null;
   const text = String(raw).trim();
 
-  // /p/MLBxxxx  => página de catálogo (lista vários vendedores)
+  // /p/MLBxxxx => página de catálogo (vários vendedores)
   const pMatch = text.match(/\/p\/(MLB\d+)/i);
   if (pMatch) return { id: pMatch[1].toUpperCase(), kind: 'product' };
+
+  // item_id=MLBxxxx ou wid=MLBxxxx => anúncio
+  const qMatch = text.match(/(?:item_id|wid)=?(MLB\d{6,})/i);
+  if (qMatch) return { id: qMatch[1].toUpperCase(), kind: 'item' };
 
   // MLB-xxxx (com hífen) => anúncio individual
   const dashMatch = text.match(/MLB-?(\d{6,})/i);
@@ -42,8 +56,7 @@ async function getAnyConnectedToken() {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null;
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/ml_accounts` +
-      `?connected=eq.true&select=account_id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/ml_accounts?connected=eq.true&select=account_id&limit=1`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     if (!res.ok) return null;
@@ -62,72 +75,111 @@ async function mlGet(url, token) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return { ok: false, status: res.status, data: null };
     return { ok: true, status: 200, data: await res.json() };
-  } catch (e) {
+  } catch {
     return { ok: false, status: 0, data: null };
   }
 }
 
-// ── Resolve o "cabeçalho" do produto colado ───────────────────
-async function resolveHeader(parsed, token) {
-  // 1) tenta como produto de catálogo
-  if (parsed.kind === 'product' || parsed.kind === 'unknown') {
-    const p = await mlGet(`https://api.mercadolibre.com/products/${parsed.id}`, token);
-    if (p.ok && p.data) {
-      const d = p.data;
-      const pic = d.pictures?.[0]?.secure_url || d.pictures?.[0]?.url || null;
-      const price = d.buy_box_winner?.price ?? null;
-      return {
-        header: {
-          id: d.id, title: d.name || d.title || parsed.id,
-          thumbnail: pic, price, permalink: d.permalink || null, catalog: true,
-        },
-        catalogId: d.id,
-      };
-    }
+// ── Resolve o que foi colado: anúncio E/OU catálogo ───────────
+// Devolve o cabeçalho do produto + catalogId (se houver) + título
+// de fallback + o seller do próprio anúncio (para não listar ele
+// mesmo como concorrente).
+async function resolveTarget(parsed, token) {
+  let itemData = null;
+  let productData = null;
+
+  const tryItem = async () => {
+    const it = await mlGet(`${API}/items/${parsed.id}`, token);
+    if (it.ok && it.data) itemData = it.data;
+  };
+  const tryProduct = async () => {
+    const p = await mlGet(`${API}/products/${parsed.id}`, token);
+    if (p.ok && p.data) productData = p.data;
+  };
+
+  // Ordem conforme o formato; com fallback cruzado se o 1º falhar
+  if (parsed.kind === 'product') {
+    await tryProduct();
+    if (!productData) await tryItem();
+  } else {
+    await tryItem();
+    if (!itemData) await tryProduct();
   }
-  // 2) tenta como anúncio individual
-  const it = await mlGet(`https://api.mercadolibre.com/items/${parsed.id}`, token);
-  if (it.ok && it.data) {
-    const d = it.data;
-    return {
-      header: {
-        id: d.id, title: d.title || parsed.id,
-        thumbnail: d.secure_thumbnail || d.thumbnail || null,
-        price: d.price ?? null, permalink: d.permalink || null,
-        catalog: !!d.catalog_product_id,
-        sellerId: d.seller_id || null,
-      },
-      catalogId: d.catalog_product_id || null,
-      itemTitle: d.title || null,
+
+  // Descobre o catálogo: do produto direto, ou do anúncio que
+  // pertence a um catálogo.
+  let catalogId = null;
+  if (itemData) catalogId = itemData.catalog_product_id || null;
+  if (productData) catalogId = productData.id;
+
+  // Se temos um anúncio com catálogo mas ainda não buscamos o
+  // produto do catálogo, busca para enriquecer o cabeçalho.
+  if (!productData && catalogId) {
+    const p = await mlGet(`${API}/products/${catalogId}`, token);
+    if (p.ok && p.data) productData = p.data;
+  }
+
+  // Monta o cabeçalho: prioriza dados do catálogo; senão, do anúncio.
+  let header = null;
+  if (productData) {
+    const d = productData;
+    const pic = d.pictures?.[0]?.secure_url || d.pictures?.[0]?.url
+              || itemData?.secure_thumbnail || itemData?.thumbnail || null;
+    const price = d.buy_box_winner?.price ?? itemData?.price ?? null;
+    header = {
+      id: d.id,
+      title: d.name || d.title || itemData?.title || parsed.id,
+      thumbnail: pic,
+      price,
+      permalink: d.permalink || itemData?.permalink || null,
+      catalog: true,
+    };
+  } else if (itemData) {
+    const d = itemData;
+    header = {
+      id: d.id,
+      title: d.title || parsed.id,
+      thumbnail: d.secure_thumbnail || d.thumbnail || null,
+      price: d.price ?? null,
+      permalink: d.permalink || null,
+      catalog: !!d.catalog_product_id,
+      sellerId: d.seller_id || null,
     };
   }
-  return { header: null, catalogId: null };
+
+  return {
+    header,
+    catalogId,
+    fallbackTitle: header?.title || itemData?.title || null,
+    selfSellerId: itemData?.seller_id || null,
+  };
 }
 
-// ── Busca a lista de ofertas (vendedores) ─────────────────────
+// ── Busca as ofertas (vendedores) ─────────────────────────────
+// Catálogo -> todos os vendedores do mesmo produto.
+// Sem catálogo -> busca por título (produtos similares).
 async function fetchOffers(catalogId, fallbackTitle, token) {
   let raw = [];
 
-  // A) catálogo -> /products/{id}/items  (todos os vendedores)
   if (catalogId) {
-    const r = await mlGet(
-      `https://api.mercadolibre.com/products/${catalogId}/items?limit=20`, token);
+    // A) todos os vendedores do produto de catálogo
+    const r = await mlGet(`${API}/products/${catalogId}/items?limit=50`, token);
     if (r.ok && Array.isArray(r.data?.results) && r.data.results.length) {
       raw = r.data.results;
     }
     // B) fallback: search por catalog_product_id
     if (!raw.length) {
       const s = await mlGet(
-        `https://api.mercadolibre.com/sites/${SITE}/search?catalog_product_id=${catalogId}&limit=20`, token);
+        `${API}/sites/${SITE}/search?catalog_product_id=${catalogId}&limit=50`, token);
       if (s.ok && Array.isArray(s.data?.results)) raw = s.data.results;
     }
   }
 
-  // C) último recurso: busca por texto do título
+  // C) anúncio avulso (ou catálogo sem ofertas): busca por título
   if (!raw.length && fallbackTitle) {
     const q = encodeURIComponent(fallbackTitle.split(' ').slice(0, 6).join(' '));
     const s = await mlGet(
-      `https://api.mercadolibre.com/sites/${SITE}/search?q=${q}&limit=20`, token);
+      `${API}/sites/${SITE}/search?q=${q}&limit=30`, token);
     if (s.ok && Array.isArray(s.data?.results)) raw = s.data.results;
   }
 
@@ -136,8 +188,6 @@ async function fetchOffers(catalogId, fallbackTitle, token) {
 
 // ── Normaliza uma oferta (formatos /items e /search diferem) ──
 function normalizeOffer(o) {
-  // /products/{id}/items: { item_id, seller_id, price, ... }
-  // /search:              { id, seller:{id,nickname}, price, sold_quantity, shipping:{free_shipping}, available_quantity, permalink, title }
   const sellerId = o.seller_id || o.seller?.id || null;
   const shipping = o.shipping || {};
   return {
@@ -153,9 +203,9 @@ function normalizeOffer(o) {
   };
 }
 
-// ── Enriquece reputacao via /users/{id} ──────────────────────
+// ── Enriquece reputação via /users/{id} ──────────────────────
 async function enrichSeller(sellerId, token) {
-  const u = await mlGet(`https://api.mercadolibre.com/users/${sellerId}`, token);
+  const u = await mlGet(`${API}/users/${sellerId}`, token);
   if (!u.ok || !u.data) return null;
   const d = u.data;
   const rep = d.seller_reputation || {};
@@ -164,8 +214,8 @@ async function enrichSeller(sellerId, token) {
   return {
     seller_id: sellerId,
     nickname: d.nickname || null,
-    level_id: rep.level_id || null,                 // ex "5_green"
-    power_seller: rep.power_seller_status || null,  // platinum/gold/silver
+    level_id: rep.level_id || null,
+    power_seller: rep.power_seller_status || null,
     positive_pct: typeof positive === 'number' ? Math.round(positive * 100) : null,
     total_ratings: tr.total ?? null,
   };
@@ -179,7 +229,7 @@ export default async function handler(req, res) {
   if (!parsed) {
     return res.status(400).json({
       ok: false,
-      error: 'Não consegui identificar um produto nesse link. Cole o link do produto no Mercado Livre (precisa ter MLB e números).',
+      error: 'Não consegui identificar um produto nesse link. Cole o link do catálogo (/p/MLB...) ou de um anúncio (MLB-...) do Mercado Livre.',
     });
   }
 
@@ -192,21 +242,24 @@ export default async function handler(req, res) {
   if (!token) {
     return res.status(409).json({
       ok: false,
-      error: 'Nenhuma loja conectada. Conecte pelo menos uma loja (ex: Urso Forte) para pesquisar concorrentes.',
+      error: 'Nenhuma loja conectada. Conecte pelo menos uma loja para pesquisar concorrentes.',
     });
   }
 
   try {
-    // 1) Produto colado (cabeçalho)
-    const { header, catalogId, itemTitle } = await resolveHeader(parsed, token);
+    // 1) Resolve catálogo e/ou anúncio
+    const { header, catalogId, fallbackTitle, selfSellerId } =
+      await resolveTarget(parsed, token);
 
     // 2) Ofertas / vendedores
-    const rawOffers = await fetchOffers(catalogId, header?.title || itemTitle, token);
+    const rawOffers = await fetchOffers(catalogId, fallbackTitle, token);
 
-    // 3) Normaliza + dedupe por vendedor (1 oferta por vendedor, a mais barata)
+    // 3) Normaliza + dedupe por vendedor (a mais barata por vendedor),
+    //    e remove o próprio anúncio colado da lista de concorrentes.
     const byseller = new Map();
     for (const o of rawOffers.map(normalizeOffer)) {
       if (!o.seller_id || o.price == null) continue;
+      if (selfSellerId && String(o.seller_id) === String(selfSellerId)) continue;
       const prev = byseller.get(o.seller_id);
       if (!prev || o.price < prev.price) byseller.set(o.seller_id, o);
     }
@@ -227,8 +280,8 @@ export default async function handler(req, res) {
         seller: o.seller_nick || r.nickname || `Vendedor ${o.seller_id}`,
         seller_id: o.seller_id,
         price: o.price,
-        available: o.available,           // estoque (pode vir null)
-        sold: o.sold,                     // vendas (pode vir null)
+        available: o.available,
+        sold: o.sold,
         level_id: r.level_id || null,
         power_seller: r.power_seller || null,
         positive_pct: r.positive_pct ?? null,
@@ -246,11 +299,15 @@ export default async function handler(req, res) {
       debug: {
         parsed_kind: parsed.kind,
         catalog_id: catalogId,
+        is_catalog: !!catalogId,
         raw_count: rawOffers.length,
         used_fallback_token: usedFallback,
       },
     });
   } catch (err) {
-    return res.status(500).json({ ok: false, error: 'Erro ao buscar concorrentes: ' + (err.message || 'desconhecido') });
+    return res.status(500).json({
+      ok: false,
+      error: 'Erro ao buscar concorrentes: ' + (err.message || 'desconhecido'),
+    });
   }
 }
