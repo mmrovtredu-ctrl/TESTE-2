@@ -4,6 +4,11 @@
    - o produto colado (em cima)
    - os vendedores que vendem o mesmo produto (embaixo, na tabela de 7 colunas)
   Backend: /api/competitors-track?link=...&account_id=...
+
+  MOBILE: a barra de "colar link" agora usa as classes do design
+  (.form-row/.input/.btn), que já empilham no celular. A tabela
+  recebe data-label em cada célula, então no celular ela vira
+  "cards" (cada vendedor num bloco) via CSS — no PC continua tabela.
 */
 
 let priceHistoryChartInstance = null;
@@ -28,22 +33,17 @@ function ensureCompetitorLinkBar() {
 
   const bar = document.createElement('div');
   bar.id = 'competitorLinkBar';
-  bar.style.cssText = 'margin:0 0 16px 0;display:flex;flex-direction:column;gap:8px;';
+  bar.className = 'panel';
+  bar.style.cssText = 'margin:0 0 16px 0;';
+  // Usa .form-row/.input/.btn — já responsivos (empilham no mobile, toque 44px)
   bar.innerHTML = `
-    <label style="font-size:0.85rem;color:var(--color-text-muted,#8fa3b8);">
+    <label class="form-hint" style="display:block;margin-bottom:8px;">
       Cole o link de um produto do Mercado Livre para ver a concorrência
     </label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <input id="competitorLinkInput" type="text"
-        placeholder="https://www.mercadolivre.com.br/.../p/MLB..."
-        style="flex:1;min-width:240px;padding:10px 12px;border-radius:8px;
-               border:1px solid var(--color-border,#213548);
-               background:var(--color-bg-elevated,#0f1b29);
-               color:var(--color-text,#e6eef6);font-size:0.9rem;" />
-      <button id="competitorLinkBtn"
-        style="padding:10px 18px;border:none;border-radius:8px;cursor:pointer;
-               background:var(--color-accent,#ffb454);color:#1a1206;
-               font-weight:600;font-size:0.9rem;">Buscar concorrentes</button>
+    <div class="form-row">
+      <input id="competitorLinkInput" type="text" class="input"
+        placeholder="https://www.mercadolivre.com.br/.../p/MLB..." />
+      <button id="competitorLinkBtn" class="btn btn--primary">Buscar concorrentes</button>
     </div>
     <div id="competitorProductHeader"></div>
   `;
@@ -112,11 +112,11 @@ function renderProductHeader(product) {
     : (product.price != null ? `R$ ${product.price}` : '—');
 
   box.innerHTML = `
-    <div style="display:flex;gap:14px;align-items:center;margin-top:10px;padding:12px;
+    <div style="display:flex;gap:14px;align-items:center;margin-top:12px;padding:12px;
                 border:1px solid var(--color-border,#213548);border-radius:10px;
-                background:var(--color-bg-elevated,#0f1b29);">
+                background:var(--color-bg,#0b1620);">
       ${product.thumbnail
-        ? `<img src="${product.thumbnail}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#fff;" />`
+        ? `<img src="${product.thumbnail}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#fff;flex-shrink:0;" />`
         : ''}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;color:var(--color-text,#e6eef6);
@@ -129,12 +129,12 @@ function renderProductHeader(product) {
       </div>
       ${product.permalink
         ? `<a href="${product.permalink}" target="_blank" rel="noopener"
-             style="font-size:0.82rem;color:var(--color-info,#5fb3d9);white-space:nowrap;">Ver no ML ↗</a>`
+             style="font-size:0.82rem;color:var(--color-info,#5fb3d9);white-space:nowrap;flex-shrink:0;">Ver no ML ↗</a>`
         : ''}
     </div>`;
 }
 
-// ── Tabela de concorrentes (7 colunas) ────────────────────────
+// ── Tabela de concorrentes (7 colunas / cards no mobile) ──────
 function renderCompetitors(product, competitors) {
   const tbody = document.querySelector('#competitorDetailTable tbody');
   if (!tbody) return;
@@ -178,15 +178,16 @@ function renderCompetitors(product, competitors) {
       else if (c.price > yourPrice) priceStyle += 'color:var(--color-negative,#ff7a7a);';
     }
 
+    // data-label = nome da coluna, usado para virar "cards" no celular
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><a href="${c.permalink || '#'}" target="_blank" rel="noopener" title="${(c.title || '').replace(/"/g,'')}">${c.seller}</a></td>
-      <td style="${priceStyle}">${c.price != null ? fmtCur(c.price) : '—'}</td>
-      <td>${estoque}</td>
-      <td>${vendas}</td>
-      <td>${rep}${ps}</td>
-      <td>${aval}</td>
-      <td>${frete}</td>`;
+      <td data-label="Vendedor"><a href="${c.permalink || '#'}" target="_blank" rel="noopener" title="${(c.title || '').replace(/"/g,'')}">${c.seller}</a></td>
+      <td data-label="Preço" style="${priceStyle}">${c.price != null ? fmtCur(c.price) : '—'}</td>
+      <td data-label="Estoque">${estoque}</td>
+      <td data-label="Vendas (30d)">${vendas}</td>
+      <td data-label="Reputação">${rep}${ps}</td>
+      <td data-label="Avaliação">${aval}</td>
+      <td data-label="Frete">${frete}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -195,14 +196,15 @@ function renderCompetitors(product, competitors) {
   if (prices.length) {
     const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
     const tr = document.createElement('tr');
+    tr.className = 'competitor-avg-row';
     tr.style.cssText = 'background:var(--color-bg-elevated-2,#16273a);font-weight:600;';
     let cmp = '';
     if (yourPrice != null && typeof formatTrend === 'function') {
       cmp = ` — Produto: ${fmtCur(yourPrice)} (${formatTrend(((yourPrice - avg) / avg) * 100)})`;
     }
     tr.innerHTML = `
-      <td>Média concorrentes</td>
-      <td>${fmtCur(avg)}</td>
+      <td data-label="Resumo">Média concorrentes</td>
+      <td data-label="Preço médio">${fmtCur(avg)}</td>
       <td colspan="5" style="color:var(--color-text-muted,#8fa3b8);font-size:0.8rem;">${cmp}</td>`;
     tbody.appendChild(tr);
   }
@@ -239,6 +241,7 @@ function renderPriceBarChart(yourPrice, competitors) {
     data: { labels, datasets: [{ label: 'Preço (R$)', data: values, backgroundColor: colors }] },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#5d7186', font: { size: 10 } } },

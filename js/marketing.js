@@ -1,7 +1,13 @@
 /*
-  js/marketing.js — com busca real no ML
+  js/marketing.js — com busca real no ML + FICHA DE PUBLICAÇÃO
   Igual ao analyzer: aceita texto livre, busca no ML,
   usuário seleciona o produto, gera o pacote de marketing.
+
+  NOVO: ao final do resultado, monta uma "Ficha para publicar no
+  Mercado Livre" — junta o que a IA já gerou (título, preço,
+  descrição, palavras-chave) com os campos que faltavam (categoria,
+  condição, estoque, tipo de anúncio, marca/modelo, código de barras,
+  envio, garantia, fotos). Tudo editável, com botão de copiar.
 */
 
 function initMarketing() {
@@ -222,4 +228,188 @@ function renderMarketingFromAPI(data) {
   document.getElementById('mktFaq').innerHTML = faq.map(f => `
     <div class="result-block__field"><span>${f.question}</span><p>${f.answer}</p></div>
   `).join('');
+
+  // NOVO: ficha completa para publicar o anúncio
+  renderMarketingLaunchSheet(data);
+}
+
+/* ============================================================
+   FICHA PARA PUBLICAR NO MERCADO LIVRE
+   Junta o que a IA gerou + os campos que faltavam, em um único
+   bloco organizado e editável, com botão de copiar tudo.
+   ============================================================ */
+
+// Escapa aspas/sinais para usar com segurança dentro de value="" e placeholder=""
+function mlsEsc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function renderMarketingLaunchSheet(data) {
+  const resultBox = document.getElementById('marketingResult');
+  if (!resultBox) return;
+
+  // Evita duplicar a ficha se gerar de novo
+  const old = document.getElementById('mktLaunchSheet');
+  if (old) old.remove();
+
+  const ld        = data.listing_data || {};
+  const attrs     = Array.isArray(ld.suggested_attributes) ? ld.suggested_attributes : [];
+  const price     = (data.recommended_price != null && data.recommended_price !== 0)
+    ? data.recommended_price : '';
+  const title     = data.optimized_title || '';
+  const desc      = data.ad_copy || '';
+
+  const sectionLabel = (txt) =>
+    `<span style="display:block;font-family:var(--font-mono);font-size:0.72rem;text-transform:uppercase;
+      letter-spacing:0.06em;color:var(--color-accent);font-weight:600;margin:14px 0 4px;">${txt}</span>`;
+
+  const gridOpen  = `<div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">`;
+  const gridClose = `</div>`;
+
+  // Campos de atributos dinâmicos (Marca, Modelo, Cor...)
+  const attrFields = attrs.map((a, i) => `
+    <label class="field">
+      <span>${mlsEsc(a.name || ('Atributo ' + (i + 1)))}</span>
+      <input class="input" id="mlsAttr_${i}" data-attr-name="${mlsEsc(a.name || '')}"
+             placeholder="${mlsEsc(a.example || '')}" />
+    </label>`).join('');
+
+  const panel = document.createElement('div');
+  panel.className = 'panel panel--accent';
+  panel.id = 'mktLaunchSheet';
+  panel.innerHTML = `
+    <div class="panel__header">
+      <h2>✅ Ficha para publicar no Mercado Livre</h2>
+      <span class="panel__hint">Preencha na hora de criar o anúncio</span>
+    </div>
+
+    <div class="result-block">
+
+      ${sectionLabel('1 · Título e identificação')}
+      <div class="form-grid">
+        <label class="field">
+          <span>Título (máx. 60) — <em id="mlsTitleCount" style="font-style:normal;color:var(--color-text-faint);">0/60</em></span>
+          <input class="input" id="mlsTitle" maxlength="60" value="${mlsEsc(title)}" />
+        </label>
+      </div>
+      ${gridOpen}
+        <label class="field">
+          <span>Categoria sugerida</span>
+          <input class="input" id="mlsCategory" value="${mlsEsc(ld.suggested_category || '')}" />
+        </label>
+        <label class="field">
+          <span>Condição</span>
+          <select class="select" id="mlsCondition">
+            <option ${ld.recommended_condition === 'Usado' ? '' : 'selected'}>Novo</option>
+            <option ${ld.recommended_condition === 'Usado' ? 'selected' : ''}>Usado</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>SKU (seu código interno)</span>
+          <input class="input" id="mlsSku" placeholder="opcional" />
+        </label>
+        <label class="field">
+          <span>Código de barras (GTIN/EAN)</span>
+          <input class="input" id="mlsGtin" placeholder="se a categoria exigir" />
+        </label>
+      ${gridClose}
+      <p class="form-hint">A categoria acima é uma estimativa — confirme a categoria exata no Mercado Livre (ele sugere pelo título).</p>
+
+      ${sectionLabel('2 · Preço, estoque e tipo de anúncio')}
+      ${gridOpen}
+        <label class="field">
+          <span>Preço de venda (R$)</span>
+          <input class="input" id="mlsPrice" type="number" step="0.01" min="0" value="${mlsEsc(price)}" />
+        </label>
+        <label class="field">
+          <span>Estoque (unidades)</span>
+          <input class="input" id="mlsStock" type="number" min="0" placeholder="quantas você tem" />
+        </label>
+        <label class="field">
+          <span>Tipo de anúncio</span>
+          <select class="select" id="mlsListingType">
+            <option ${ld.recommended_listing_type === 'Premium' ? '' : 'selected'}>Clássico</option>
+            <option ${ld.recommended_listing_type === 'Premium' ? 'selected' : ''}>Premium</option>
+          </select>
+        </label>
+      ${gridClose}
+      ${ld.listing_type_reason ? `<p class="form-hint">${ld.listing_type_reason}</p>` : ''}
+
+      ${attrs.length ? sectionLabel('3 · Atributos da categoria (Ficha técnica)') : ''}
+      ${attrs.length ? gridOpen + attrFields + gridClose : ''}
+
+      ${sectionLabel('4 · Descrição do anúncio')}
+      <label class="field">
+        <span>Descrição (pronta para colar)</span>
+        <textarea class="input" id="mlsDesc" rows="6" style="resize:vertical;line-height:1.5;">${mlsEsc(desc)}</textarea>
+      </label>
+      <button class="btn btn--ghost" id="mlsCopyDesc" style="align-self:flex-start;margin-top:6px;">Copiar descrição</button>
+
+      <button class="btn btn--primary btn--block" id="mlsCopyAll">📋 Copiar ficha completa</button>
+    </div>
+  `;
+
+  resultBox.appendChild(panel);
+
+  // ── Listeners ──────────────────────────────────────────────
+  const titleInput = document.getElementById('mlsTitle');
+  const titleCount = document.getElementById('mlsTitleCount');
+  const updateCount = () => { titleCount.textContent = `${titleInput.value.length}/60`; };
+  titleInput.addEventListener('input', updateCount);
+  updateCount();
+
+  const copyFeedback = (btn, text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copiado!';
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(() => alert('Não consegui copiar automaticamente. Selecione e copie manualmente.'));
+  };
+
+  document.getElementById('mlsCopyDesc').addEventListener('click', (e) => {
+    copyFeedback(e.target, document.getElementById('mlsDesc').value);
+  });
+
+  document.getElementById('mlsCopyAll').addEventListener('click', (e) => {
+    copyFeedback(e.target, buildFichaText());
+  });
+}
+
+// Monta o texto da ficha completa a partir dos campos atuais
+function buildFichaText() {
+  const val = (id) => (document.getElementById(id)?.value || '').trim();
+
+  const lines = [];
+  lines.push('=== FICHA PARA PUBLICAR NO MERCADO LIVRE ===', '');
+  lines.push('• Título: ' + val('mlsTitle'));
+  lines.push('• Categoria sugerida: ' + val('mlsCategory'));
+  lines.push('• Condição: ' + val('mlsCondition'));
+  if (val('mlsSku'))  lines.push('• SKU: ' + val('mlsSku'));
+  if (val('mlsGtin')) lines.push('• Código de barras (GTIN/EAN): ' + val('mlsGtin'));
+  lines.push('');
+  lines.push('• Preço: R$ ' + val('mlsPrice'));
+  lines.push('• Estoque: ' + val('mlsStock') + ' unidade(s)');
+  lines.push('• Tipo de anúncio: ' + val('mlsListingType'));
+  lines.push('');
+
+  // Atributos da categoria
+  const attrInputs = document.querySelectorAll('[id^="mlsAttr_"]');
+  if (attrInputs.length) {
+    lines.push('— Ficha técnica —');
+    attrInputs.forEach((inp) => {
+      const name = inp.getAttribute('data-attr-name') || 'Atributo';
+      const v = (inp.value || '').trim();
+      lines.push('• ' + name + ': ' + (v || '(preencher)'));
+    });
+    lines.push('');
+  }
+
+  lines.push('— Descrição —');
+  lines.push(val('mlsDesc'));
+
+  return lines.join('\n');
 }
