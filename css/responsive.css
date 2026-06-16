@@ -1,12 +1,22 @@
 /*
-  responsive.css
-  ---------------
-  Ajustes para tablet e celular.
-  Estratégia: a sidebar fica oculta em telas pequenas e é
-  substituída pelo menu inferior (bottom-nav).
+  responsive.css — versão otimizada para mobile
+  -----------------------------------------------
+  Estratégia geral:
+  - Em telas pequenas a sidebar some e o menu vai pro rodapé (bottom-nav).
+  - A topbar se reorganiza: marca + ações na 1ª linha, seletor de conta
+    ocupa uma linha própria embaixo (não estoura mais para os lados).
+  - As tabelas largas ganham PRIMEIRA COLUNA FIXA + rolagem suave, então
+    você sempre enxerga o nome do produto enquanto desliza o resto.
+  - Formulários, cards de busca e a barra de "colar link" empilham.
+  - Alvos de toque de no mínimo 44px (recomendação da Apple).
+  - Respeito a safe areas do iPhone (notch / home indicator).
+
+  Nada aqui depende de mudança no JS — é só trocar este arquivo.
 */
 
-/* ===================== TABLET (até 1024px) ===================== */
+/* ============================================================
+   TABLET (até 1024px)
+   ============================================================ */
 @media (max-width: 1024px) {
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -17,7 +27,9 @@
   }
 }
 
-/* ===================== MOBILE (até 768px) ===================== */
+/* ============================================================
+   MOBILE (até 768px) — núcleo
+   ============================================================ */
 @media (max-width: 768px) {
   /* Esconde a sidebar e usa o menu inferior */
   .sidebar {
@@ -34,30 +46,30 @@
     padding-bottom: calc(var(--bottom-nav-height) + var(--space-lg));
   }
 
+  /* Painéis mais enxutos para sobrar largura útil */
+  .panel {
+    padding: var(--space-md);
+  }
+
+  .view {
+    gap: var(--space-md);
+  }
+
   .kpi-grid,
   .kpi-grid--compact {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-sm);
   }
 
+  .kpi-card {
+    padding: var(--space-sm) var(--space-md);
+  }
+
   .kpi-card__value {
     font-size: 1.25rem;
   }
 
-  /* Topbar mais compacta */
-  .topbar {
-    padding: 0 var(--space-md);
-    gap: var(--space-sm);
-  }
-
-  .topbar__title span {
-    display: none;
-  }
-
-  .account-switcher__label {
-    display: none;
-  }
-
+  /* Cabeçalho de cada tela empilha título e botão */
   .view__header {
     flex-direction: column;
     align-items: stretch;
@@ -70,36 +82,93 @@
   h1 {
     font-size: 1.25rem;
   }
+
+  h2 {
+    font-size: 1rem;
+  }
 }
 
-/* ===================== TELAS MUITO PEQUENAS (até 380px) ===================== */
+/* ============================================================
+   TOPBAR MOBILE — reorganiza em 2 linhas (até 600px)
+   ------------------------------------------------------------
+   Linha 1: marca (à esquerda) + ações do usuário (à direita).
+   Linha 2: seletor de conta ocupando a largura inteira.
+   Assim os botões "Conectar/Desconectar" deixam de espremer tudo.
+   ============================================================ */
+@media (max-width: 600px) {
+  .topbar {
+    height: auto;
+    min-height: var(--topbar-height);
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 8px var(--space-md);
+    align-items: center;
+  }
+
+  .topbar__brand {
+    order: 1;
+  }
+
+  .topbar__user {
+    order: 2;
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+  }
+
+  /* O seletor de conta vai para a 2ª linha, largura cheia */
+  .account-switcher {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+
+  .account-switcher__select {
+    flex: 1;
+    max-width: none;
+  }
+
+  /* Botões "Conectar/Desconectar" (injetados via JS) ficam compactos */
+  #mlConnectBtn,
+  #mlDisconnectBtn {
+    font-size: 0.72rem !important;
+    padding: 8px 10px !important;
+    margin-left: 4px !important;
+    min-height: 36px;
+  }
+
+  /* Só o "Control" basta; o subtítulo já some no bloco abaixo */
+  .topbar__title strong {
+    font-size: 0.95rem;
+  }
+}
+
+/* ============================================================
+   TELAS MUITO PEQUENAS (até 380px)
+   ============================================================ */
 @media (max-width: 380px) {
   .kpi-grid,
   .kpi-grid--compact {
     grid-template-columns: 1fr;
   }
 
-  .account-switcher__select {
-    max-width: 90px;
+  /* Em telas minúsculas, esconde a marca de texto e deixa só o "ML" */
+  .topbar__title {
+    display: none;
   }
 }
 
-/*
-  responsive-iphone.css
-  ----------------------
-  Ajustes adicionais focados em iPhone:
-  - Evita zoom automático do iOS em inputs (font-size >= 16px)
-  - Respeita safe areas (notch e home indicator)
-  - Bottom-nav com 7 itens: reduz para caber sem cortar
-  - Scroll horizontal mais visível em tabelas largas
-  - Pequenos ajustes de toque (área mínima de 44px recomendada pela Apple)
+/* ============================================================
+   AJUSTES FOCADOS EM iPhone
+   - Evita zoom automático do iOS em inputs (font-size >= 16px)
+   - Respeita safe areas (notch e home indicator)
+   - Bottom-nav com 7 itens: reduz para caber sem cortar
+   - Scroll horizontal mais visível em tabelas largas
+   - Área de toque mínima (44px)
+   ============================================================ */
 
-  INSTRUÇÕES: adicione ao FINAL de css/responsive.css
-*/
-
-/* ===================== EVITA ZOOM AUTOMÁTICO NO iOS ===================== */
-/* iOS dá zoom em inputs com font-size < 16px ao focar. Forçamos 16px
-   apenas em telas pequenas, sem alterar o visual no desktop. */
+/* ----- Evita zoom automático no iOS ao focar inputs ----- */
 @media (max-width: 768px) {
   .input,
   .select,
@@ -110,11 +179,10 @@
   }
 }
 
-/* ===================== SAFE AREAS (notch / home indicator) ===================== */
+/* ----- Safe areas (notch / home indicator) ----- */
 @media (max-width: 768px) {
   .topbar {
-    padding-top: env(safe-area-inset-top);
-    height: calc(var(--topbar-height) + env(safe-area-inset-top));
+    padding-top: max(8px, env(safe-area-inset-top));
   }
 
   .bottom-nav {
@@ -127,10 +195,7 @@
   }
 }
 
-/* ===================== BOTTOM-NAV COM 7 ITENS ===================== */
-/* Com Catálogo + Marketing adicionados, ficaram 7 itens no menu
-   inferior. Reduzimos o tamanho do texto/ícone e o padding para
-   caber sem cortar, especialmente em iPhone SE (375px de largura). */
+/* ----- Bottom-nav com 7 itens ----- */
 @media (max-width: 768px) {
   .bottom-nav {
     display: flex;
@@ -141,7 +206,7 @@
 
   .bottom-nav__item {
     font-size: 0.95rem;
-    min-width: 0; /* permite encolher abaixo do conteúdo */
+    min-width: 0;
     padding: 4px 0;
   }
 
@@ -151,7 +216,6 @@
   }
 }
 
-/* Em telas muito estreitas (iPhone SE, 375px), reduz mais ainda */
 @media (max-width: 390px) {
   .bottom-nav__item {
     font-size: 0.85rem;
@@ -162,39 +226,158 @@
   }
 }
 
-/* ===================== TABELAS: INDICAÇÃO DE SCROLL ===================== */
-/* As tabelas novas (Catálogo, Top 5 concorrentes, Campanhas,
-   Monitor) têm muitas colunas. Em telas pequenas, adicionamos
-   sombra nas bordas para indicar que há conteúdo fora da tela. */
+/* ============================================================
+   TABELAS NO MOBILE
+   - Primeira coluna FIXA ao rolar (você sempre vê o produto/vendedor)
+   - Rolagem horizontal suave com sombra indicando "tem mais ao lado"
+   - Fontes e padding compactos
+   ============================================================ */
 @media (max-width: 768px) {
   .table-scroll {
     position: relative;
-    -webkit-overflow-scrolling: touch; /* scroll suave no iOS */
+    -webkit-overflow-scrolling: touch; /* rolagem suave no iOS */
   }
 
+  /* Sombra na borda direita: sinaliza que há conteúdo fora da tela */
   .table-scroll::after {
     content: "";
     position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
-    width: 16px;
+    width: 18px;
     background: linear-gradient(to right, transparent, var(--color-bg-elevated));
     pointer-events: none;
   }
 
   .data-table {
     font-size: 0.8rem;
+    min-width: 0; /* usa a largura disponível; rola só se precisar */
   }
 
   .data-table th,
   .data-table td {
-    padding: 8px 10px;
+    padding: 9px 10px;
+    white-space: nowrap; /* evita quebra estranha; o scroll cuida do resto */
+  }
+
+  /* PRIMEIRA COLUNA FIXA (nome do produto / vendedor) */
+  .data-table th:first-child,
+  .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--color-bg-elevated);
+    /* leve divisória para destacar a coluna fixa do conteúdo que rola */
+    box-shadow: 1px 0 0 var(--color-border);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .data-table th:first-child {
+    z-index: 2;
   }
 }
 
-/* ===================== ÁREA DE TOQUE MÍNIMA (44px) ===================== */
-/* Apple recomenda alvos de toque de pelo menos 44x44px */
+/* ============================================================
+   FORMULÁRIOS: campos e botões empilhados
+   ============================================================ */
+@media (max-width: 480px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row .input,
+  .form-row .select,
+  .form-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* O <select> de status do catálogo tem max-width fixo no HTML */
+  #catalogStatusFilter {
+    max-width: none !important;
+  }
+}
+
+/* ============================================================
+   BARRA "COLAR LINK" (Concorrentes) — injetada via JS
+   Empilha input + botão e deixa o botão largura cheia.
+   ============================================================ */
+@media (max-width: 480px) {
+  #competitorLinkBar > div {
+    flex-direction: column;
+  }
+
+  #competitorLinkInput,
+  #competitorLinkBtn {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ============================================================
+   CARDS DE BUSCA (Analisar / Marketing) — injetados via JS
+   Garante que não estourem a largura em telas estreitas.
+   ============================================================ */
+@media (max-width: 480px) {
+  #analyzerSearchGrid > div,
+  #mktSearchGrid > div {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================================
+   CAMPANHAS: item expansível empilha em tela pequena
+   ============================================================ */
+@media (max-width: 480px) {
+  .campaign-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+/* ============================================================
+   GRÁFICOS (Chart.js) — limita a altura no mobile
+   para não dominarem a tela.
+   ============================================================ */
+@media (max-width: 768px) {
+  .panel canvas {
+    max-height: 240px;
+  }
+}
+
+/* ============================================================
+   PAINEL DE STATUS DO MONITOR (5 colunas)
+   2 colunas no mobile, 1 em telas minúsculas.
+   ============================================================ */
+@media (max-width: 768px) {
+  .monitor-status__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 390px) {
+  .monitor-status__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   ALERTAS: um pouco mais compactos no mobile
+   ============================================================ */
+@media (max-width: 480px) {
+  .alert-item {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+}
+
+/* ============================================================
+   ÁREA DE TOQUE MÍNIMA (44px) — recomendação da Apple
+   ============================================================ */
 @media (max-width: 768px) {
   .btn {
     min-height: 44px;
@@ -213,51 +396,25 @@
   .bottom-nav__item {
     min-height: 44px;
   }
-}
 
-/* ===================== PAINEL DE STATUS DO MONITOR (5 colunas) ===================== */
-/* monitor-status__grid já tem regra para 2 colunas em <768px,
-   mas em telas muito pequenas (iPhone SE) ainda fica apertado.
-   Reduz para 1 coluna abaixo de 390px. */
-@media (max-width: 390px) {
-  .monitor-status__grid {
-    grid-template-columns: 1fr;
+  /* Linhas clicáveis (campanhas) com altura de toque confortável */
+  .campaign-row td {
+    padding-top: 12px;
+    padding-bottom: 12px;
   }
 }
 
-/* ===================== FORMULÁRIOS: BOTÕES EMPILHADOS ===================== */
-/* form-row (usado em Catálogo, Analisar, Marketing) empilha
-   input + select/botão verticalmente em telas pequenas, em vez
-   de espremer tudo na mesma linha. */
-@media (max-width: 480px) {
-  .form-row {
-    flex-direction: column;
-  }
-
-  .form-row .input,
-  .form-row .select,
-  .form-row .btn {
-    width: 100%;
-    min-width: 0;
-  }
-}
-
-/* ===================== CAMPANHAS: ITEM EXPANSÍVEL EM TELA PEQUENA ===================== */
-@media (max-width: 480px) {
-  .campaign-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-}
-
-/* ===================== PREVINE OVERFLOW HORIZONTAL GERAL ===================== */
+/* ============================================================
+   PREVINE OVERFLOW HORIZONTAL GERAL
+   ============================================================ */
 @media (max-width: 768px) {
+  html,
   body {
     overflow-x: hidden;
   }
 
   .main {
     overflow-x: hidden;
+    max-width: 100%;
   }
 }
