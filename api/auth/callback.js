@@ -1,6 +1,10 @@
 // api/auth/callback.js
-// Recebe o code OAuth do ML, troca por access_token + refresh_token
-// e salva na linha correta do Supabase (cada conta tem a sua linha).
+// ─────────────────────────────────────────────────────────────
+// Recebe o code OAuth do ML e troca pelo token usando o APP
+// ESPECÍFICO da conta (1 app por conta). Salva no Supabase.
+// ─────────────────────────────────────────────────────────────
+
+import { getAppCredentials, ML_REDIRECT_URI, VALID_ACCOUNTS } from '../_mlApps.js';
 
 export default async function handler(req, res) {
   const { code, state, error: mlError } = req.query;
@@ -21,31 +25,29 @@ export default async function handler(req, res) {
     console.warn('[callback] Erro ao parsear state:', e);
   }
 
-  const validAccounts = ['acc_1', 'acc_2', 'acc_3', 'acc_4'];
-  if (!validAccounts.includes(accountId)) {
+  if (!VALID_ACCOUNTS.includes(accountId)) {
     return res.redirect('/?ml_error=conta_invalida');
   }
 
-  const clientId     = (process.env.ML_CLIENT_ID         || '').trim();
-  const clientSecret = (process.env.ML_CLIENT_SECRET     || '').trim();
-  const redirectUri  = (process.env.ML_REDIRECT_URI      || '').trim();
-  const supabaseUrl  = (process.env.SUPABASE_URL         || '').trim();
-  const supabaseKey  = (process.env.SUPABASE_SERVICE_KEY || '').trim();
-
-  if (!clientId || !clientSecret || !redirectUri) {
+  const app = getAppCredentials(accountId);
+  if (!app || !ML_REDIRECT_URI) {
+    console.error(`[callback] Credenciais ausentes para ${accountId}`);
     return res.redirect(`/?ml_error=config_incompleta&account=${accountId}`);
   }
+
+  const supabaseUrl = (process.env.SUPABASE_URL         || '').trim();
+  const supabaseKey = (process.env.SUPABASE_SERVICE_KEY || '').trim();
 
   try {
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        client_secret: clientSecret,
+        grant_type:    'authorization_code',
+        client_id:     app.clientId,
+        client_secret: app.clientSecret,
         code,
-        redirect_uri: redirectUri,
+        redirect_uri:  ML_REDIRECT_URI,
       }),
     });
     const tokenData = await tokenRes.json();
@@ -61,19 +63,19 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Prefer: 'resolution=merge-duplicates',
+        apikey:         supabaseKey,
+        Authorization:  `Bearer ${supabaseKey}`,
+        Prefer:         'resolution=merge-duplicates',
       },
       body: JSON.stringify({
-        account_id: accountId,
+        account_id:   accountId,
         account_name: accountName,
-        ml_user_id: String(user_id),
+        ml_user_id:   String(user_id),
         access_token,
         refresh_token,
-        expires_in: expires_in || 21600,
-        connected: true,
-        updated_at: new Date().toISOString(),
+        expires_in:   expires_in || 21600,
+        connected:    true,
+        updated_at:   new Date().toISOString(),
       }),
     });
 
