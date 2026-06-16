@@ -1,210 +1,195 @@
 // api/campaigns.js
 // ─────────────────────────────────────────────────────────────
-// Busca campanhas do vendedor (promoções de desconto) + Product Ads
-// para qualquer uma das 4 contas ML.
-// Usa getTokenForAccount() para renovação automática de token.
+// CAMPANHAS — duas frentes:
+//   1) Promoções/descontos do vendedor  (campaigns) -> SEMPRE funciona
+//      via /seller-promotions/users/{user_id}
+//   2) Publicidade / Product Ads        (ads)       -> TENTA; se o ML
+//      bloquear (precisa de permissão de publicidade), volta null e a
+//      tela mostra o estado vazio amigável.
+// A frente (js/campaigns.js) já consome { campaigns, ads, not_connected }.
 // ─────────────────────────────────────────────────────────────
 
 import { getTokenForAccount } from './_tokenHelper.js';
 
-export default async function handler(req, res) {
-  const { account_id } = req.query;
+const API = 'https://api.mercadolibre.com';
 
-  if (!account_id) {
-    return res.status(400).json({ error: 'account_id não informado.' });
+// fetch JSON tolerante a erro
+async function jget(url, token, extraHeaders = {}) {
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, ...extraHeaders },
+    });
+    if (!res.ok) return { ok: false, status: res.status, data: null };
+    return { ok: true, status: 200, data: await res.json() };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+// ── Títulos dos itens (multiget) ──────────────────────────────
+async function fetchItemTitles(ids, token) {
+  const map = {};
+  if (!ids.length) return map;
+  const chunk = ids.slice(0, 20).join(',');
+  const r = await jget(`${API}/items?ids=${chunk}&attributes=id,title`, token);
+  if (r.ok && Array.isArray(r.data)) {
+    r.data.forEach(entry => {
+      const b = entry?.body;
+      if (b?.id) map[b.id] = b.title || b.id;
+    });
+  }
+  return map;
+}
+
+// ── Promoções do vendedor ─────────────────────────────────────
+async function getSellerCampaigns(userId, token) {
+  const list = await jget(
+    `${API}/seller-promotions/users/${userId}?app_version=v2`, token);
+  if (!list.ok || !Array.isArray(list.data?.results)) {
+    return { campaigns: [], debug: { promo_status: list.status } };
+  }
+
+  // Pega no máximo 12 promoções, prioriza ativas/agendadas
+  const order = { started: 0, pending: 1, finished: 2 };
+  const promos = list.data.results
+    .slice()
+    .sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3))
+    .slice(0, 12);
+
+  const campaigns = await Promise.all(promos.map(async (p) => {
+    // itens da promoção
+    const itemsRes = await jget(
+      `${API}/seller-promotions/promotions/${p.id}/items` +
+      `?promotion_type=${encodeURIComponent(p.type)}&app_version=v2&limit=50`, token);
+
+    const rawItems = (itemsRes.ok && Array.isArray(itemsRes.data?.results))
+      ? itemsRes.data.results : [];
+    const itemCount = itemsRes.data?.paging?.total ?? rawItems.length;
+
+    // títulos (até 20)
+    const ids = rawItems.map(it => it.id).filter(Boolean).slice(0, 20);
+    const titles = await fetchItemTitles(ids, token);
+
+    const items = rawItems.slice(0, 20).map(it => {
+      const orig = Number(it.original_price) || 0;
+      const deal = Number(it.price) || 0;
+      const discount = (orig > 0 && deal > 0 && deal < orig)
+        ? Math.round((1 - deal / orig) * 100) : 0;
+      return {
+        title: titles[it.id] || it.id,
+        discount,
+        originalPrice: orig,
+        dealPrice: deal,
+        status: it.status || '—',
+      };
+    });
+
+    return {
+      id: p.id,
+      name: p.name || `${p.type} ${p.id}`,
+      type: p.type,
+      itemCount,
+      startDate: p.start_date || null,
+      finishDate: p.finish_date || null,
+      status: p.status,
+      items,
+    };
+  }));
+
+  return { campaigns, debug: { promo_status: 200, promo_total: list.data.paging?.total } };
+}
+
+// ── Publicidade / Product Ads (melhor esforço) ────────────────
+async function getProductAds(token) {
+  const debug = {};
+  // 1) advertisers (precisa de permissão de publicidade)
+  const adv = await jget(`${API}/advertising/advertisers?product_id=PADS`,
+    token, { 'Api-Version': '1' });
+  debug.advertisers_status = adv.status;
+
+  if (!adv.ok || !Array.isArray(adv.data?.advertisers) || !adv.data.advertisers.length) {
+    return { ads: null, debug };
+  }
+
+  const advertiserId = adv.data.advertisers[0].advertiser_id;
+  debug.advertiser_id = advertiserId;
+
+  // 2) campanhas do anunciante (estrutura varia; mapeamos defensivo)
+  const camp = await jget(
+    `${API}/advertising/product_ads/campaigns?advertiser_id=${advertiserId}&limit=50`,
+    token, { 'Api-Version': '1' });
+  debug.campaigns_status = camp.status;
+
+  const raw = (camp.ok && Array.isArray(camp.data?.results)) ? camp.data.results
+            : (camp.ok && Array.isArray(camp.data?.campaigns)) ? camp.data.campaigns
+            : [];
+
+  if (!raw.length) return { ads: null, debug };
+
+  const campaigns = raw.map(c => {
+    const m = c.metrics || c.metrics_summary || {};
+    const spend = Number(m.cost ?? m.spend ?? 0);
+    const revenue = Number(m.direct_amount ?? m.total_amount ?? m.revenue ?? 0);
+    const clicks = Number(m.clicks ?? 0);
+    const impressions = Number(m.prints ?? m.impressions ?? 0);
+    const conversions = Number(m.direct_units ?? m.units ?? m.conversions ?? 0);
+    const acos = revenue > 0 ? (spend / revenue) * 100 : 0;
+    return {
+      name: c.name || c.campaign_name || `Campanha ${c.id || ''}`,
+      spend30d: spend,
+      revenue30d: revenue,
+      clicks,
+      impressions,
+      conversions,
+      acos,
+      status: (c.status || '').toLowerCase() || 'active',
+    };
+  });
+
+  const totalSpend30d = campaigns.reduce((s, c) => s + c.spend30d, 0);
+  const totalRevenue = campaigns.reduce((s, c) => s + c.revenue30d, 0);
+  const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalImpr = campaigns.reduce((s, c) => s + c.impressions, 0);
+  const totals = {
+    totalSpend30d,
+    totalAcos: totalRevenue > 0 ? (totalSpend30d / totalRevenue) * 100 : 0,
+    totalClicks,
+    totalCtr: totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0,
+  };
+
+  return { ads: { totals, campaigns }, debug };
+}
+
+export default async function handler(req, res) {
+  const accountId = req.query.account_id || 'acc_1';
+
+  let token = null;
+  try { token = await getTokenForAccount(accountId); } catch { token = null; }
+  if (!token) {
+    return res.status(409).json({ ok: false, not_connected: true, account_id: accountId });
   }
 
   try {
-    const accessToken = await getTokenForAccount(account_id);
-
-    if (!accessToken) {
-      return res.status(401).json({
-        error: 'Conta não conectada.',
-        not_connected: true,
-        account_id,
-      });
+    // user_id da conta autenticada
+    const me = await jget(`${API}/users/me`, token);
+    const userId = me.ok ? me.data?.id : null;
+    if (!userId) {
+      return res.status(409).json({ ok: false, not_connected: true, account_id: accountId });
     }
 
-    // Busca campanhas de desconto + Product Ads em paralelo
-    const [sellerCampaigns, productAds] = await Promise.allSettled([
-      fetchSellerCampaigns(accessToken),
-      fetchProductAds(accessToken),
+    // Promoções (sempre) + Ads (tenta) em paralelo
+    const [promoRes, adsRes] = await Promise.all([
+      getSellerCampaigns(userId, token),
+      getProductAds(token).catch(() => ({ ads: null, debug: { ads_error: true } })),
     ]);
 
-    const campaigns = sellerCampaigns.status === 'fulfilled' ? sellerCampaigns.value : [];
-    const ads       = productAds.status === 'fulfilled'      ? productAds.value      : null;
-
-    return res.status(200).json({ campaigns, ads });
-
-  } catch (error) {
-    console.error(`[campaigns] Erro para ${account_id}:`, error);
-    return res.status(500).json({ error: 'Erro ao buscar campanhas.' });
+    return res.status(200).json({
+      ok: true,
+      campaigns: promoRes.campaigns,
+      ads: adsRes.ads,
+      debug: { user_id: userId, ...promoRes.debug, ...adsRes.debug },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'Erro ao carregar campanhas: ' + (err.message || 'desconhecido') });
   }
-}
-
-// ─── CAMPANHAS DE DESCONTO DO VENDEDOR ───────────────────────
-
-async function fetchSellerCampaigns(accessToken) {
-  const res = await fetch(
-    'https://api.mercadolibre.com/seller-promotions/promotions' +
-    '?promotion_type=SELLER_CAMPAIGN&app_version=v2',
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-
-  if (!res.ok) return [];
-
-  const data      = await res.json();
-  const campaigns = data.results || [];
-  if (campaigns.length === 0) return [];
-
-  const withItems = await Promise.all(
-    campaigns.map(async c => {
-      try {
-        const itemsRes = await fetch(
-          `https://api.mercadolibre.com/seller-promotions/promotions/${c.id}/items` +
-          `?promotion_type=SELLER_CAMPAIGN&app_version=v2`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const itemsData = itemsRes.ok ? await itemsRes.json() : {};
-        const items     = itemsData.results || [];
-
-        const itemIds = items.map(i => i.id).slice(0, 20);
-        let itemDetails = [];
-
-        if (itemIds.length > 0) {
-          const detailRes = await fetch(
-            `https://api.mercadolibre.com/items?ids=${itemIds.join(',')}&attributes=id,title,price,thumbnail`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          const detailData = detailRes.ok ? await detailRes.json() : [];
-          itemDetails = detailData.map(d => d.body).filter(Boolean);
-        }
-
-        const enrichedItems = items.map(item => {
-          const detail = itemDetails.find(d => d.id === item.id) || {};
-          return {
-            id:            item.id,
-            title:         detail.title || item.id,
-            thumbnail:     detail.thumbnail || null,
-            originalPrice: item.original_price || detail.price || 0,
-            dealPrice:     item.price || 0,
-            discount:      item.original_price && item.price
-              ? Math.round(((item.original_price - item.price) / item.original_price) * 100)
-              : 0,
-            status:    item.status,
-            startDate: item.start_date,
-            endDate:   item.end_date,
-          };
-        });
-
-        return {
-          id:         c.id,
-          name:       c.name,
-          type:       'SELLER_CAMPAIGN',
-          subType:    c.sub_type,
-          status:     c.status,
-          startDate:  c.start_date,
-          finishDate: c.finish_date,
-          itemCount:  items.length,
-          items:      enrichedItems,
-        };
-      } catch (err) {
-        console.warn(`[campaigns] Erro itens campanha ${c.id}:`, err);
-        return { ...c, items: [] };
-      }
-    })
-  );
-
-  return withItems;
-}
-
-// ─── PRODUCT ADS ──────────────────────────────────────────────
-
-async function fetchProductAds(accessToken) {
-  const userRes = await fetch('https://api.mercadolibre.com/users/me', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!userRes.ok) return null;
-
-  const user   = await userRes.json();
-  const userId = user.id;
-
-  const accountRes = await fetch(
-    `https://api.mercadolibre.com/advertising/onsite/accounts?user_id=${userId}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!accountRes.ok) return null;
-
-  const accountData = await accountRes.json();
-  const adAccountId = accountData?.results?.[0]?.id;
-  if (!adAccountId) return null;
-
-  const today      = new Date();
-  const thirtyAgo  = new Date(today - 30 * 24 * 60 * 60 * 1000);
-  const dateFrom   = thirtyAgo.toISOString().split('T')[0];
-  const dateTo     = today.toISOString().split('T')[0];
-
-  const campRes = await fetch(
-    `https://api.mercadolibre.com/advertising/onsite/accounts/${adAccountId}/campaigns?limit=50`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!campRes.ok) return null;
-
-  const campData   = await campRes.json();
-  const adCampaigns = campData.results || [];
-  if (adCampaigns.length === 0) return { campaigns: [], totals: null };
-
-  const campaignsWithMetrics = await Promise.all(
-    adCampaigns.map(async c => {
-      try {
-        const metricsRes = await fetch(
-          `https://api.mercadolibre.com/advertising/onsite/accounts/${adAccountId}/campaigns/${c.id}/metrics` +
-          `?date_from=${dateFrom}&date_to=${dateTo}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const metrics = metricsRes.ok ? await metricsRes.json() : {};
-        const m       = metrics.results?.[0] || {};
-
-        return {
-          id:           c.id,
-          name:         c.name,
-          status:       c.status,
-          type:         'PRODUCT_ADS',
-          spend30d:     m.costs || 0,
-          revenue30d:   m.attributed_sales || 0,
-          clicks:       m.clicks || 0,
-          impressions:  m.prints || 0,
-          conversions:  m.attributed_orders || 0,
-          ctr:          m.prints > 0 ? parseFloat(((m.clicks / m.prints) * 100).toFixed(2)) : 0,
-          acos:         m.attributed_sales > 0
-            ? parseFloat(((m.costs / m.attributed_sales) * 100).toFixed(1))
-            : 0,
-        };
-      } catch {
-        return {
-          ...c, type: 'PRODUCT_ADS',
-          spend30d: 0, revenue30d: 0,
-          clicks: 0, impressions: 0, conversions: 0,
-          ctr: 0, acos: 0,
-        };
-      }
-    })
-  );
-
-  const totals = campaignsWithMetrics.reduce((acc, c) => ({
-    totalSpend30d:    acc.totalSpend30d    + c.spend30d,
-    totalRevenue30d:  acc.totalRevenue30d  + c.revenue30d,
-    totalClicks:      acc.totalClicks      + c.clicks,
-    totalImpressions: acc.totalImpressions + c.impressions,
-    totalConversions: acc.totalConversions + c.conversions,
-  }), { totalSpend30d: 0, totalRevenue30d: 0, totalClicks: 0, totalImpressions: 0, totalConversions: 0 });
-
-  totals.totalAcos = totals.totalRevenue30d > 0
-    ? parseFloat(((totals.totalSpend30d / totals.totalRevenue30d) * 100).toFixed(1))
-    : 0;
-  totals.totalCtr = totals.totalImpressions > 0
-    ? parseFloat(((totals.totalClicks / totals.totalImpressions) * 100).toFixed(2))
-    : 0;
-
-  return { campaigns: campaignsWithMetrics, totals };
 }
