@@ -672,7 +672,7 @@
         <div class="view__header">
           <div>
             <h1>Precificação rápida</h1>
-            <p class="view__subtitle">Informe os custos e veja o preço sugerido com a margem desejada</p>
+            <p class="view__subtitle">Informe os custos e clique em "Calcular preço" para ver o resultado</p>
           </div>
         </div>
 
@@ -702,6 +702,11 @@
                 <span>Margem de lucro desejada (%)</span>
                 <input type="number" step="0.01" min="0" class="input" id="pMargin" value="20" />
               </label>
+
+              <!-- Botão que dispara o cálculo (type="button" para não dar submit/reload) -->
+              <button type="button" class="btn btn--primary btn--block" id="pCalcBtn">
+                Calcular preço
+              </button>
             </form>
           </div>
 
