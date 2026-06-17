@@ -1,19 +1,28 @@
 /*
-  js/competitors.js — versão LINK do produto (cola o link e vê concorrentes)
-  Cola o link de um produto do Mercado Livre e mostra:
-   - o produto colado (em cima)
-   - os vendedores que vendem o mesmo produto (embaixo, na tabela de 7 colunas)
-  Backend: /api/competitors-track?link=...&account_id=...
+  js/competitors.js — recebe o produto IGUAL ao Marketing
+  -------------------------------------------------------
+  A aba Concorrentes agora aceita as DUAS formas, exatamente como a
+  aba Marketing:
+   1. Cole o LINK (catálogo /p/MLB... ou anúncio MLB-...) → analisa direto
+   2. Digite o NOME do produto → busca no ML (/api/search), mostra os
+      resultados em cards e, ao clicar num card, analisa a concorrência
+      daquele produto.
 
-  MOBILE: a barra de "colar link" agora usa as classes do design
-  (.form-row/.input/.btn), que já empilham no celular. A tabela
-  recebe data-label em cada célula, então no celular ela vira
-  "cards" (cada vendedor num bloco) via CSS — no PC continua tabela.
+  O que ela FAZ continua igual: chama /api/competitors-track e mostra
+  o produto escolhido + os vendedores concorrentes + o gráfico.
+  Só mudou COMO o link chega até a busca.
 */
 
 let priceHistoryChartInstance = null;
 
-// ── Cria a barra de "colar link" dentro da aba Concorrentes ───
+// ── É link/ID do ML? (mesma regra do Marketing) ───────────────
+function isMLLink(text) {
+  return text.includes('mercadolivre.com')
+      || text.includes('mercadolibre.com')
+      || /^MLB\d+$/i.test(text.trim());
+}
+
+// ── Cria a barra de busca (link OU nome) + caixa de cards ─────
 function ensureCompetitorLinkBar() {
   if (document.getElementById('competitorLinkBar')) return;
 
@@ -23,7 +32,7 @@ function ensureCompetitorLinkBar() {
   // Esconde o seletor antigo de produtos (não usamos mais)
   const oldSelect = document.getElementById('competitorProductSelect');
   if (oldSelect) {
-    const wrap = oldSelect.closest('div') || oldSelect;
+    const wrap = oldSelect.closest('.panel') || oldSelect.closest('div') || oldSelect;
     wrap.style.display = 'none';
   }
 
@@ -31,41 +40,169 @@ function ensureCompetitorLinkBar() {
   const card = table.closest('.card, .panel, section, div');
   const anchor = card || table;
 
+  // Barra de entrada (link ou nome) — usa .form-row/.input/.btn (responsivos)
   const bar = document.createElement('div');
   bar.id = 'competitorLinkBar';
   bar.className = 'panel';
   bar.style.cssText = 'margin:0 0 16px 0;';
-  // Usa .form-row/.input/.btn — já responsivos (empilham no mobile, toque 44px)
   bar.innerHTML = `
     <label class="form-hint" style="display:block;margin-bottom:8px;">
-      Cole o link do <strong>catálogo</strong> (/p/MLB...) ou de um <strong>anúncio</strong> (MLB-...) do Mercado Livre
+      Cole o <strong>link</strong> (catálogo /p/MLB... ou anúncio MLB-...) ou digite o <strong>nome</strong> do produto
     </label>
     <div class="form-row">
       <input id="competitorLinkInput" type="text" class="input"
-        placeholder="Link do catálogo ou do anúncio (ex: .../p/MLB... ou .../MLB-...)" />
+        placeholder="Link do Mercado Livre ou nome do produto" />
       <button id="competitorLinkBtn" class="btn btn--primary">Buscar concorrentes</button>
     </div>
     <div id="competitorProductHeader"></div>
   `;
-
   anchor.parentNode.insertBefore(bar, anchor);
 
-  document.getElementById('competitorLinkBtn')
-    .addEventListener('click', runCompetitorSearch);
-  document.getElementById('competitorLinkInput')
-    .addEventListener('keydown', e => { if (e.key === 'Enter') runCompetitorSearch(); });
+  // Caixa de resultados da busca por NOME (cards) — igual ao Marketing
+  const searchBox = document.createElement('div');
+  searchBox.id = 'competitorSearchResults';
+  searchBox.className = 'panel is-hidden';
+  searchBox.innerHTML = `
+    <div class="panel__header">
+      <h2>Selecione o produto para ver os concorrentes</h2>
+      <span class="panel__hint" id="competitorSearchCount">—</span>
+    </div>
+    <div id="competitorSearchGrid" style="display:flex;flex-direction:column;gap:8px;"></div>
+  `;
+  bar.parentNode.insertBefore(searchBox, bar.nextSibling);
+
+  const input = document.getElementById('competitorLinkInput');
+  const btn   = document.getElementById('competitorLinkBtn');
+
+  btn.addEventListener('click', handleCompetitorInput);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') handleCompetitorInput(); });
+
+  // Busca em tempo real ao digitar o nome (debounce 600ms) — igual ao Marketing
+  let debounceTimer;
+  input.addEventListener('input', () => {
+    const value = input.value.trim();
+    clearTimeout(debounceTimer);
+    if (value.length < 2 || isMLLink(value)) {
+      searchBox.classList.add('is-hidden');
+      return;
+    }
+    debounceTimer = setTimeout(() => searchMLCompetitors(value), 600);
+  });
 }
 
-// ── Dispara a busca ───────────────────────────────────────────
-async function runCompetitorSearch() {
+// ── Decide: link → analisa direto / nome → busca cards ────────
+function handleCompetitorInput() {
   const input = document.getElementById('competitorLinkInput');
-  const link = (input?.value || '').trim();
+  const value = (input?.value || '').trim();
+
+  if (!value) {
+    const headerBox = document.getElementById('competitorProductHeader');
+    if (headerBox) headerBox.innerHTML =
+      `<p style="color:var(--color-negative,#ff7a7a);margin:6px 0;">Cole um link ou digite o nome do produto.</p>`;
+    return;
+  }
+
+  if (isMLLink(value)) {
+    runCompetitorSearch();          // é link/ID → vai direto
+  } else {
+    searchMLCompetitors(value);     // é texto → busca no ML primeiro
+  }
+}
+
+// ── Busca por nome no ML (mesma API do Marketing) ─────────────
+async function searchMLCompetitors(query) {
+  const btn = document.getElementById('competitorLinkBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Buscando…'; }
+
+  try {
+    const res  = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=8`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro na busca.');
+    renderCompetitorSearchResults(data.items || [], data.total || 0);
+  } catch (err) {
+    const headerBox = document.getElementById('competitorProductHeader');
+    if (headerBox) headerBox.innerHTML =
+      `<p style="color:var(--color-negative,#ff7a7a);margin:6px 0;">${err.message || 'Erro ao buscar no Mercado Livre.'}</p>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Buscar concorrentes'; }
+  }
+}
+
+// ── Cards de resultado (igual ao Marketing) ───────────────────
+function renderCompetitorSearchResults(items, total) {
+  const box   = document.getElementById('competitorSearchResults');
+  const grid  = document.getElementById('competitorSearchGrid');
+  const count = document.getElementById('competitorSearchCount');
+  if (!box || !grid) return;
+
+  count.textContent = `${total.toLocaleString('pt-BR')} resultados — mostrando ${items.length}`;
+  grid.innerHTML = '';
+
+  if (items.length === 0) {
+    grid.innerHTML = `<p class="form-hint">Nenhum resultado encontrado. Tente outra busca.</p>`;
+    box.classList.remove('is-hidden');
+    return;
+  }
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      display:flex;align-items:center;gap:12px;padding:10px 14px;
+      background:var(--color-bg);border:1px solid var(--color-border);
+      border-radius:var(--radius-sm);cursor:pointer;transition:border-color .15s;
+    `;
+    card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--color-accent)'; });
+    card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--color-border)'; });
+
+    const imgHtml = item.thumbnail
+      ? `<img src="${item.thumbnail}" alt="" style="width:48px;height:48px;object-fit:contain;border-radius:4px;flex-shrink:0;">`
+      : `<div style="width:48px;height:48px;background:var(--color-bg-elevated-2);border-radius:4px;flex-shrink:0;"></div>`;
+
+    const shipping = item.free_shipping
+      ? `<span class="tag tag--ok" style="font-size:0.65rem;">Frete grátis</span>` : '';
+
+    card.innerHTML = `
+      ${imgHtml}
+      <div style="flex:1;min-width:0;">
+        <p style="font-size:0.85rem;font-weight:600;margin:0 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.title}</p>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-family:var(--font-mono);font-size:0.85rem;font-weight:700;">${formatCurrency(item.price)}</span>
+          <span style="font-size:0.75rem;color:var(--color-text-muted);">${item.sold_quantity} vendidos</span>
+          <span style="font-size:0.75rem;color:var(--color-text-muted);">${item.seller}</span>
+          ${shipping}
+        </div>
+      </div>
+      <span style="font-size:0.75rem;color:var(--color-accent);font-weight:600;flex-shrink:0;">Ver concorrentes →</span>
+    `;
+
+    // Ao clicar no card: joga o link no input e dispara a análise (igual Marketing)
+    card.addEventListener('click', () => {
+      const input = document.getElementById('competitorLinkInput');
+      input.value = item.permalink || item.ml_link;
+      box.classList.add('is-hidden');
+      runCompetitorSearch();
+    });
+
+    grid.appendChild(card);
+  });
+
+  box.classList.remove('is-hidden');
+}
+
+// ── Dispara a busca de concorrentes (backend INALTERADO) ──────
+async function runCompetitorSearch() {
+  const input     = document.getElementById('competitorLinkInput');
+  const link      = (input?.value || '').trim();
   const headerBox = document.getElementById('competitorProductHeader');
-  const tbody = document.querySelector('#competitorDetailTable tbody');
+  const tbody     = document.querySelector('#competitorDetailTable tbody');
+
+  // Esconde os cards de busca por nome, se estiverem abertos
+  const searchBox = document.getElementById('competitorSearchResults');
+  if (searchBox) searchBox.classList.add('is-hidden');
 
   if (!link) {
     if (headerBox) headerBox.innerHTML =
-      `<p style="color:var(--color-negative,#ff7a7a);margin:6px 0;">Cole um link primeiro.</p>`;
+      `<p style="color:var(--color-negative,#ff7a7a);margin:6px 0;">Cole um link ou selecione um produto primeiro.</p>`;
     return;
   }
 
@@ -101,7 +238,7 @@ async function runCompetitorSearch() {
   }
 }
 
-// ── Produto colado (cabeçalho, em cima) ───────────────────────
+// ── Produto escolhido (cabeçalho, em cima) ────────────────────
 function renderProductHeader(product) {
   const box = document.getElementById('competitorProductHeader');
   if (!box || !product) return;
@@ -255,8 +392,9 @@ function renderPriceBarChart(yourPrice, competitors) {
 function initCompetitors() {
   ensureCompetitorLinkBar();
   document.addEventListener('accountChanged', () => {
-    // mantém o resultado; só re-busca se já houver link digitado
+    // Mantém o resultado; só re-busca se já houver um LINK digitado
     const input = document.getElementById('competitorLinkInput');
-    if (input && input.value.trim()) runCompetitorSearch();
+    const value = (input?.value || '').trim();
+    if (value && isMLLink(value)) runCompetitorSearch();
   });
 }
