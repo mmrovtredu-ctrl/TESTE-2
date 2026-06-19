@@ -5,6 +5,7 @@
   ],
   "functions": {
     "api/marketing.js": { "maxDuration": 60 },
-    "api/analyze.js": { "maxDuration": 60 }
+    "api/analyze.js": { "maxDuration": 60 },
+    "api/sales-today.js": { "maxDuration": 30 }
   }
 }

@@ -157,27 +157,13 @@
           </div>
         </div>
 
-        <!-- Tabela: preço próprio vs menor concorrente -->
-        <div class="panel">
+        <!-- Vendas de hoje (tempo real) -->
+        <div class="panel" id="salesTodayPanel">
           <div class="panel__header">
-            <h2>Seu preço vs concorrência</h2>
-            <span class="panel__hint">Produtos do catálogo monitorados</span>
+            <h2>Vendas de hoje</h2>
+            <span class="panel__hint" id="salesTodayUpdated">tempo real · atualiza sozinho</span>
           </div>
-          <div class="table-scroll">
-            <table class="data-table" id="competitorTable">
-              <thead>
-                <tr>
-                  <th>Produto</th>
-                  <th>Seu preço</th>
-                  <th>Menor concorrente</th>
-                  <th>Diferença</th>
-                  <th>Estoque concorrente</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody><!-- preenchido via JS --></tbody>
-            </table>
-          </div>
+          <div id="salesTodayBody"></div>
         </div>
       </section>
 
@@ -805,6 +791,8 @@
   <script src="js/navigation.js"></script>
   <!-- Lógica da visão geral (KPIs, gráficos, tabelas) -->
   <script src="js/overview.js"></script>
+  <!-- Painel de vendas de hoje (tempo real) -->
+  <script src="js/sales-today.js"></script>
   <!-- Lógica do catálogo de produtos -->
   <script src="js/catalog.js"></script>
   <!-- Lógica de concorrentes -->
