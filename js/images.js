@@ -40,14 +40,8 @@ function handleImageUpload(file) {
   reader.readAsDataURL(file);
 }
 
-/**
- * Simula o processamento da imagem (substitua por chamada real ao backend).
- * @returns {Promise<string>} resolve com a data URL da "imagem processada"
- */
 function simulateImageGeneration() {
   return new Promise((resolve) => {
-    // Aqui, como simulação, devolvemos a própria imagem enviada.
-    // Na versão real, viria a imagem com fundo branco do backend.
     setTimeout(() => resolve(uploadedImageDataUrl), 1200);
   });
 }
