@@ -44,7 +44,7 @@ demanda/sazonalidade e margem típica.
 Responda EXCLUSIVAMENTE com um objeto JSON válido — sem markdown, sem comentários,
 sem nenhum texto antes ou depois — exatamente neste formato e com estas chaves:
 {
-  "verdict": "Vale a pena" ou "Avaliar com cautela" ou "Não recomendado",
+  "verdict": "OPORTUNIDADE" ou "COMPETITIVO" ou "SATURADO",
   "verdict_explanation": "explicação do veredito em 2 a 3 frases",
   "market_potential": { "label": "Alto" ou "Médio" ou "Baixo" },
   "competitiveness": { "label": "Alta" ou "Média" ou "Baixa" },

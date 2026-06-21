@@ -108,7 +108,8 @@ async function getProductAds(token) {
   debug.advertisers_status = adv.status;
 
   if (!adv.ok || !Array.isArray(adv.data?.advertisers) || !adv.data.advertisers.length) {
-    return { ads: null, debug };
+    const blocked = adv.status === 403 || adv.status === 401;
+    return { ads: null, ads_not_enabled: blocked, debug };
   }
 
   const advertiserId = adv.data.advertisers[0].advertiser_id;
