@@ -157,6 +157,31 @@
           </div>
         </div>
 
+        <!-- Última venda -->
+        <div class="panel" id="lastSalePanel">
+          <div class="panel__header">
+            <h2>Última venda</h2>
+            <span class="panel__hint" id="lastSaleTime">—</span>
+          </div>
+          <div id="lastSaleBody">
+            <span class="form-hint">Carregando...</span>
+          </div>
+        </div>
+
+        <!-- Análise geral do negócio (IA) -->
+        <div class="panel" id="businessAnalysisPanel">
+          <div class="panel__header">
+            <h2>Análise do negócio</h2>
+            <span class="panel__hint" id="businessAnalysisHint">diagnóstico gerado por IA</span>
+          </div>
+          <div id="businessAnalysisBody">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <p class="form-hint" style="margin:0;">Clique para gerar o diagnóstico da sua conta com IA.</p>
+              <button class="btn btn--primary" id="runBusinessAnalysis">Analisar negócio</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Vendas de hoje (tempo real) -->
         <div class="panel" id="salesTodayPanel">
           <div class="panel__header">

@@ -4,8 +4,13 @@
     { "source": "/auth/callback", "destination": "/api/auth/callback" }
   ],
   "functions": {
-    "api/marketing.js": { "maxDuration": 60 },
-    "api/analyze.js": { "maxDuration": 60 },
-    "api/sales-today.js": { "maxDuration": 30 }
-  }
+    "api/marketing.js":     { "maxDuration": 60 },
+    "api/analyze.js":       { "maxDuration": 60 },
+    "api/sales-today.js":   { "maxDuration": 30 },
+    "api/monitor-cron.js":      { "maxDuration": 60 },
+    "api/business-analysis.js": { "maxDuration": 30 }
+  },
+  "crons": [
+    { "path": "/api/monitor-cron", "schedule": "0 */2 * * *" }
+  ]
 }
