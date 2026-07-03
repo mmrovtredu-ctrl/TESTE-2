@@ -1,154 +1,144 @@
-/*
-  js/sales-today.js
-  -----------------
-  Painel "Vendas de hoje" (tempo real) na Visão geral.
-  Mostra, da conta selecionada:
-    - Vendas de hoje (qtd e unidades), Faturamento, Recebido após taxa ML, Pausados
-    - Lista de cada venda: hora, produto, qtd, valor e ESTOQUE ATUAL do item
-    - Lista de anúncios pausados
+// api/sales-today.js
+// ─────────────────────────────────────────────────────────────
+// BACKEND do painel "Vendas de hoje" (tempo real).
+// ATENÇÃO: o arquivo anterior nesta pasta era o código de
+// FRONTEND enviado por engano — por isso a função quebrava com
+// "No exports found in module" (erro 500 FUNCTION_INVOCATION_FAILED).
+//
+// Retorna o formato que o js/sales-today.js do frontend espera:
+// { today: {count, units, revenue, fees, net}, sales: [...], paused: {...} }
+// ─────────────────────────────────────────────────────────────
 
-  "Tempo real": atualiza sozinho a cada 60s e ao trocar de conta.
-  (O ML não envia dados sozinho; por isso usamos atualização periódica.)
+import { getTokenForAccount } from './_tokenHelper.js';
 
-  Depende de: /api/sales-today, getCurrentAccountId(), formatCurrency(),
-  formatNumber() e dos elementos #salesTodayBody / #salesTodayUpdated no HTML.
-*/
+export default async function handler(req, res) {
+  const { account_id } = req.query;
 
-let _salesTodayTimer = null;
-
-function stCur(v) { return (typeof formatCurrency === 'function') ? formatCurrency(v) : 'R$ ' + v; }
-function stNum(v) { return (typeof formatNumber === 'function') ? formatNumber(v) : v; }
-
-function stHora(iso) {
-  const d = new Date(iso);
-  if (isNaN(d)) return '—';
-  const p = (n) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-function stAgora() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-async function loadSalesToday() {
-  const body = document.getElementById('salesTodayBody');
-  const upd  = document.getElementById('salesTodayUpdated');
-  if (!body) return;
-
-  const accountId = (typeof getCurrentAccountId === 'function') ? getCurrentAccountId() : 'acc_1';
-
-  // Só mostra spinner na primeira carga (refresh silencioso depois)
-  if (!body.dataset.loaded) {
-    body.innerHTML = `<div class="loading-row"><span class="spinner"></span><span>Carregando vendas de hoje…</span></div>`;
+  if (!account_id) {
+    return res.status(400).json({ error: 'account_id não informado.' });
   }
 
   try {
-    const res  = await fetch(`/api/sales-today?account_id=${accountId}`);
-    const data = await res.json();
+    const accessToken = await getTokenForAccount(account_id);
 
-    if (!res.ok || data.not_connected) { renderSalesTodayNotConnected(accountId); return; }
+    if (!accessToken) {
+      return res.status(401).json({
+        error: 'Conta não conectada.',
+        not_connected: true,
+        account_id,
+      });
+    }
 
-    renderSalesToday(data);
-    body.dataset.loaded = '1';
-    if (upd) upd.textContent = `tempo real · atualizado às ${stAgora()}`;
-  } catch (e) {
-    if (upd) upd.textContent = 'falha ao atualizar — tentando de novo…';
+    // Usuário ML
+    const userRes = await fetch('https://api.mercadolibre.com/users/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!userRes.ok) {
+      if (userRes.status === 401) {
+        return res.status(401).json({
+          error: 'Token inválido. Reconecte a conta.',
+          not_connected: true,
+          account_id,
+        });
+      }
+      throw new Error(`ML /users/me error: ${userRes.status}`);
+    }
+
+    const user = await userRes.json();
+    const mlUserId = user.id;
+
+    // "Hoje" no fuso de Brasília (-03:00)
+    const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const day = brt.toISOString().split('T')[0];
+    const from = `${day}T00:00:00.000-03:00`;
+    const to   = `${day}T23:59:59.999-03:00`;
+
+    // Pedidos pagos de hoje (mais recentes primeiro)
+    const ordersRes = await fetch(
+      `https://api.mercadolibre.com/orders/search?seller=${mlUserId}` +
+      `&order.status=paid&order.date_created.from=${from}&order.date_created.to=${to}` +
+      `&sort=date_desc&limit=50`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const ordersData = await ordersRes.json();
+    const orders = ordersData.results || [];
+
+    let revenue = 0, fees = 0, units = 0;
+    const itemIds = new Set();
+
+    orders.forEach(o => {
+      revenue += o.total_amount || 0;
+      (o.order_items || []).forEach(oi => {
+        units += oi.quantity || 0;
+        fees  += (oi.sale_fee || 0) * (oi.quantity || 0);
+        if (oi.item?.id) itemIds.add(oi.item.id);
+      });
+    });
+
+    // Estoque atual dos itens vendidos hoje
+    const stockMap = {};
+    if (itemIds.size > 0) {
+      const ids = [...itemIds].slice(0, 20).join(',');
+      const itRes = await fetch(
+        `https://api.mercadolibre.com/items?ids=${ids}&attributes=id,available_quantity`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (itRes.ok) {
+        const d = await itRes.json();
+        d.forEach(x => { if (x.body) stockMap[x.body.id] = x.body.available_quantity; });
+      }
+    }
+
+    const sales = orders.map(o => ({
+      time:    o.date_created,
+      product: o.order_items?.[0]?.item?.title || '—',
+      units:   (o.order_items || []).reduce((s, oi) => s + (oi.quantity || 0), 0),
+      amount:  o.total_amount || 0,
+      stock:   stockMap[o.order_items?.[0]?.item?.id] ?? null,
+    }));
+
+    // Anúncios pausados
+    const paused = { count: 0, items: [] };
+    const pausedRes = await fetch(
+      `https://api.mercadolibre.com/users/${mlUserId}/items/search?status=paused&limit=20`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (pausedRes.ok) {
+      const pd = await pausedRes.json();
+      paused.count = pd.paging?.total ?? (pd.results || []).length;
+      const pids = (pd.results || []).slice(0, 10);
+      if (pids.length > 0) {
+        const dRes = await fetch(
+          `https://api.mercadolibre.com/items?ids=${pids.join(',')}&attributes=id,title,available_quantity`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (dRes.ok) {
+          const dd = await dRes.json();
+          paused.items = dd
+            .map(x => x.body)
+            .filter(Boolean)
+            .map(b => ({ title: b.title, stock: b.available_quantity ?? 0 }));
+        }
+      }
+    }
+
+    return res.status(200).json({
+      account_id,
+      ml_user_id: mlUserId,
+      today: {
+        count:   ordersData.paging?.total ?? orders.length,
+        units,
+        revenue,
+        fees,
+        net: revenue - fees,
+      },
+      sales,
+      paused,
+    });
+
+  } catch (error) {
+    console.error(`[sales-today] Erro para ${account_id}:`, error);
+    return res.status(500).json({ error: 'Erro ao buscar vendas de hoje.' });
   }
-}
-
-function renderSalesTodayNotConnected(accountId) {
-  const accounts = window._mlAccounts || [];
-  const name = accounts.find(a => a.account_id === accountId)?.account_name || accountId;
-  const body = document.getElementById('salesTodayBody');
-  body.dataset.loaded = '';
-  body.innerHTML = `<p style="padding:16px;text-align:center;">⚠️ A loja <strong>${name}</strong> não está conectada.</p>`;
-}
-
-function renderSalesToday(data) {
-  const t      = data.today || {};
-  const sales  = data.sales || [];
-  const paused = data.paused || { count: 0, items: [] };
-
-  const kpis = `
-    <div class="kpi-grid kpi-grid--compact" style="margin-bottom:var(--space-md);">
-      <article class="kpi-card">
-        <span class="kpi-card__label">Vendas hoje</span>
-        <strong class="kpi-card__value">${stNum(t.count || 0)}</strong>
-        <span class="kpi-card__trend">${stNum(t.units || 0)} un.</span>
-      </article>
-      <article class="kpi-card">
-        <span class="kpi-card__label">Faturamento hoje</span>
-        <strong class="kpi-card__value">${stCur(t.revenue || 0)}</strong>
-      </article>
-      <article class="kpi-card">
-        <span class="kpi-card__label">Recebido após taxa ML</span>
-        <strong class="kpi-card__value">${stCur(t.net || 0)}</strong>
-        <span class="kpi-card__trend">taxa ${stCur(t.fees || 0)}</span>
-      </article>
-      <article class="kpi-card">
-        <span class="kpi-card__label">Anúncios pausados</span>
-        <strong class="kpi-card__value">${stNum(paused.count || 0)}</strong>
-      </article>
-    </div>`;
-
-  let salesTable;
-  if (!sales.length) {
-    salesTable = `<p class="form-hint" style="padding:8px 0;">Nenhuma venda registrada hoje ainda. Assim que cair um pedido pago, ele aparece aqui.</p>`;
-  } else {
-    const rows = sales.map(s => `
-      <tr>
-        <td>${stHora(s.time)}</td>
-        <td>${s.product}</td>
-        <td>${stNum(s.units || 0)}</td>
-        <td>${stCur(s.amount || 0)}</td>
-        <td>${s.stock == null ? '—' : (s.stock === 0 ? '<span class="tag tag--danger">0</span>' : stNum(s.stock))}</td>
-      </tr>`).join('');
-    salesTable = `
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr><th>Hora</th><th>Produto</th><th>Qtd</th><th>Valor</th><th>Estoque atual</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-  }
-
-  let pausedBlock = '';
-  if (paused.items && paused.items.length) {
-    pausedBlock = `
-      <div style="margin-top:var(--space-md);">
-        <span class="panel__hint">Pausados nesta conta (${stNum(paused.count)})</span>
-        <ul class="product-list" style="margin-top:6px;">
-          ${paused.items.map(p => `
-            <li>
-              <span class="product-list__name">${p.title}</span>
-              <span class="product-list__meta">${p.stock === 0 ? 'sem estoque' : stNum(p.stock) + ' un.'}</span>
-            </li>`).join('')}
-        </ul>
-      </div>`;
-  }
-
-  const note = `<p class="form-hint" style="margin-top:var(--space-md);">
-    "Recebido após taxa ML" já desconta a comissão do Mercado Livre. O <strong>lucro real</strong>
-    depende do custo do produto (que o ML não armazena) — dá para cadastrar o custo depois e
-    calcular o lucro líquido por venda.
-  </p>`;
-
-  document.getElementById('salesTodayBody').innerHTML = kpis + salesTable + pausedBlock + note;
-}
-
-function initSalesToday() {
-  loadSalesToday();
-
-  if (_salesTodayTimer) clearInterval(_salesTodayTimer);
-  _salesTodayTimer = setInterval(loadSalesToday, 60000); // atualiza a cada 60s
-
-  document.addEventListener('accountChanged', () => {
-    const body = document.getElementById('salesTodayBody');
-    if (body) body.dataset.loaded = '';
-    loadSalesToday();
-  });
 }
